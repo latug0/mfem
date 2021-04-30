@@ -1,16 +1,12 @@
 //
-// Compile with: make e2_boucle
+// Compile with: make cas_point_contact
 //
-// Sample runs:  ex2 -m ../data/beam-tri.mesh
-//               ex2 -m ../data/beam-quad.mesh
-//               ex2 -m ../data/beam-tet.mesh
-//               ex2 -m ../data/beam-hex.mesh
-//               ex2 -m ../data/beam-wedge.mesh
-//               ex2 -m ../data/beam-quad.mesh -o 3 -sc
-//               ex2 -m ../data/beam-quad-nurbs.mesh
-//               ex2 -m ../data/beam-hex-nurbs.mesh
 //
-//			Problème élastique a plusieurs chargements
+//GL: ajouter commentaire descriptif
+
+
+//GL: indenter correctement le fichier. Sous emacs
+//GL: https://unix.stackexchange.com/questions/162057/can-i-have-emacs-automatically-indent-my-whole-code-after-it-is-all-written
 
 #include "mfem.hpp"
 #include <fstream>
@@ -22,29 +18,31 @@ using namespace mfem;
 void sol_exact(const Vector &, Vector &);
 
 double ComputeEnergyNorm(Mesh &, GridFunction &,
-						 Coefficient &, Coefficient &);
+			 Coefficient &, Coefficient &);
 
 void Elasticy_mat(ElementTransformation &,const IntegrationPoint &, int, Coefficient &,
- 					  Coefficient &, DenseMatrix &);
+		  Coefficient &, DenseMatrix &);
 
 
 void Grad(ElementTransformation &,const IntegrationPoint &,
- 		  const GridFunction &, DenseMatrix &);
+	  const GridFunction &, DenseMatrix &);
 
 int main(int argc, char *argv[])
 {
-	//Variables pour l'affichage
-	int ref1;
-	DenseMatrix slope_l2, slope_ener;
-	double err_tmp_ener = 0., err_tmp_l2=0.;
-	double h_tmp = 0.;
-	int iter = 0;
+  //Variables pour l'affichage
+  int ref1;
+  DenseMatrix slope_l2, slope_ener;
+  double err_tmp_ener = 0., err_tmp_l2=0.;
+  double h_tmp = 0.;
+  int iter = 0;
    
-	const char *mesh_file = "../data/carre.msh";
+	const char *mesh_file = "carre.msh";
 	bool static_cond = false;
 	int rep=5;
 
 	int order;
+	//GL: utiliser "args.AddOption" utilisé ci-après pour spécifier 'order' et 'rep'
+	//GL: une valeur sera donnée par défaut, par exemple order=1, ref1=0, rep=4
 	cout << "Ordre de la méthode: ";  cin >> order;
 	cout << "Pour plusieurs maillages tapez 1: ";  cin >> ref1;
 	if (ref1==1){
@@ -59,8 +57,11 @@ int main(int argc, char *argv[])
 for (int ref_levels=1; ref_levels<((rep-2)*ref1+2); ref_levels++){ 
 
 if (ref1==0){
+	//GL: utiliser "args.AddOption" utilisé ci-après pour spécifier les valeurs,
+        //GL: n'utilise pas de "cin" STP
 	cout << "Combien de rafinement uniforme : "; cin >> ref_levels;}
 
+	//GL: Le traitement des options doit être remonté au-dessus de la boucle ref_level
 	// Parse command-line options.
 	OptionsParser args(argc, argv);
 	args.AddOption(&mesh_file, "-m", "--mesh",
@@ -175,6 +176,7 @@ if (ref1==0){
 	double mu;
 	mu = E/(2.*(1.+nu));
 	ConstantCoefficient mu_func(mu);
+	//GL: pas nécessaire de conserver cette formule de lambda, non ?
 //lambda = 2*lambda*mu/(lambda+2*mu);
 	ConstantCoefficient lambda_func(lambda);
 	BilinearForm *a = new BilinearForm(fespace);
@@ -198,7 +200,9 @@ if (ref1==0){
 
    cout << "Size of linear system: " << A.Height() << endl;
 
-//#ifndef MFEM_USE_SUITESPARSE
+   //GL: utiliser une option en ligne de commande pour activer soit suitesparse, soit PCG
+   //GL: il faudrait ne pas avoir à recompiler pour changer de solveur 
+   //#ifndef MFEM_USE_SUITESPARSE
    // 11. Define a simple symmetric Gauss-Seidel preconditioner and use it to
    //     solve the system Ax=b with PCG.
    GSSmoother M(A);
@@ -274,6 +278,7 @@ if (ref1==0){
 	GridFunction ex1(fespace);
 	diff.ProjectCoefficient(sol_exact_coef);
 	ex1.ProjectCoefficient(sol_exact_coef);
+	//GL: Regarder si dans les exemples MFEM une solution plus classique ne serait pas utilisée pour cette différence
 	diff-= x;
  
 	ParaViewDataCollection paraview_dc("Example2", mesh);
@@ -314,6 +319,8 @@ return 0;
 }
 
 //===================== Solution exacte =====================
+//GL: Ajouter la référence
+//GL: Test/vérifier ce que donne sol_exact pour x={0, 0}.
 void sol_exact(const Vector &x, Vector &u)
 {
   double P = 2.;
@@ -330,6 +337,7 @@ void sol_exact(const Vector &x, Vector &u)
 }
 
 //===================== Erreur Norme Energie =====================
+//GL: Ajouter de commentaires STP
 double ComputeEnergyNorm(Mesh &mesh, GridFunction &x,
 						 Coefficient &lambdah, Coefficient &muh)
 {
@@ -431,6 +439,7 @@ return (energy < 0.0) ? -sqrt(-energy) : sqrt(energy);
 }
 
 
+//GL: indiquer comment tu as trouvé cette matrice élasticité, quel algo utilises-tu
 //===================== Matrice élasticité =====================
 void Elasticy_mat(ElementTransformation &T,const IntegrationPoint &ip, 
 			int dim, Coefficient &lambda, Coefficient &mu, DenseMatrix &C){
