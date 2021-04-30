@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2020, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -33,7 +33,7 @@ void Operator::InitTVectors(const Operator *Po, const Operator *Ri,
    else
    {
       // B points to same data as b
-      B.NewMemoryAndSize(b.GetMemory(), b.Size(), false);
+      B.MakeRef(b, 0, b.Size());
    }
    if (!IsIdentityProlongation(Pi))
    {
@@ -44,7 +44,7 @@ void Operator::InitTVectors(const Operator *Po, const Operator *Ri,
    else
    {
       // X points to same data as x
-      X.NewMemoryAndSize(x.GetMemory(), x.Size(), false);
+      X.MakeRef(x, 0, x.Size());
    }
 }
 
@@ -422,6 +422,8 @@ void ConstrainedOperator::AssembleDiagonal(Vector &diag) const
 {
    A->AssembleDiagonal(diag);
 
+   if (diag_policy == DIAG_KEEP) { return; }
+
    const int csz = constraint_list.Size();
    auto d_diag = diag.ReadWrite();
    auto idx = constraint_list.Read();
@@ -442,7 +444,7 @@ void ConstrainedOperator::AssembleDiagonal(Vector &diag) const
          });
          break;
       default:
-         mfem_error("ConstrainedOperator::AssembleDiagonal");
+         MFEM_ABORT("unknown diagonal policy");
          break;
    }
 }

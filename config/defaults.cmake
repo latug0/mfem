@@ -1,4 +1,4 @@
-# Copyright (c) 2010-2020, Lawrence Livermore National Security, LLC. Produced
+# Copyright (c) 2010-2021, Lawrence Livermore National Security, LLC. Produced
 # at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 # LICENSE and NOTICE for details. LLNL-CODE-806117.
 #
@@ -45,6 +45,7 @@ option(MFEM_USE_PETSC "Enable PETSc support." OFF)
 option(MFEM_USE_SLEPC "Enable SLEPc support." OFF)
 option(MFEM_USE_MPFR "Enable MPFR usage." OFF)
 option(MFEM_USE_SIDRE "Enable Axom/Sidre usage" OFF)
+option(MFEM_USE_FMS "Enable FMS usage" OFF)
 option(MFEM_USE_CONDUIT "Enable Conduit usage" OFF)
 option(MFEM_USE_PUMI "Enable PUMI" OFF)
 option(MFEM_USE_HIOP "Enable HiOp" OFF)
@@ -55,6 +56,7 @@ option(MFEM_USE_CEED "Enable CEED" OFF)
 option(MFEM_USE_UMPIRE "Enable Umpire" OFF)
 option(MFEM_USE_SIMD "Enable use of SIMD intrinsics" OFF)
 option(MFEM_USE_ADIOS2 "Enable ADIOS2" OFF)
+option(MFEM_USE_CALIPER "Enable Caliper support" OFF)
 option(MFEM_USE_MKL_CPARDISO "Enable MKL CPardiso" OFF)
 
 set(MFEM_MPI_NP 4 CACHE STRING "Number of processes used for MPI tests")
@@ -75,6 +77,9 @@ option(MFEM_ENABLE_MINIAPPS "Build all of the miniapps" OFF)
 
 # Set the target CUDA architecture
 set(CUDA_ARCH "sm_60" CACHE STRING "Target CUDA architecture.")
+
+# Set the target HIP architecture
+set(HIP_ARCH "gfx900" CACHE STRING "Target HIP architecture.")
 
 set(MFEM_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -165,8 +170,7 @@ set(GNUTLS_DIR "" CACHE PATH "Path to the GnuTLS library.")
 set(GSLIB_DIR "" CACHE PATH "Path to the GSLIB library.")
 
 set(NETCDF_DIR "" CACHE PATH "Path to the NetCDF library.")
-# May need to add "HDF5" as requirement.
-set(NetCDF_REQUIRED_PACKAGES "" CACHE STRING
+set(NetCDF_REQUIRED_PACKAGES "HDF5/C/HL" CACHE STRING
     "Additional packages required by NetCDF.")
 
 set(PETSC_DIR "${MFEM_DIR}/../petsc" CACHE PATH
@@ -178,6 +182,9 @@ set(SLEPC_DIR "${MFEM_DIR}/../slepc" CACHE PATH
 set(SLEPC_ARCH "arch-linux2-c-debug" CACHE STRING "SLEPC build architecture.")
 
 set(MPFR_DIR "" CACHE PATH "Path to the MPFR library.")
+
+set(FMS_DIR "${MFEM_DIR}/../fms" CACHE PATH
+    "Path to the FMS library.")
 
 set(CONDUIT_DIR "${MFEM_DIR}/../conduit" CACHE PATH
     "Path to the Conduit library.")
@@ -203,6 +210,7 @@ set(OCCA_DIR "${MFEM_DIR}/../occa" CACHE PATH "Path to OCCA")
 set(RAJA_DIR "${MFEM_DIR}/../raja" CACHE PATH "Path to RAJA")
 set(CEED_DIR "${MFEM_DIR}/../libCEED" CACHE PATH "Path to libCEED")
 set(UMPIRE_DIR "${MFEM_DIR}/../umpire" CACHE PATH "Path to Umpire")
+set(CALIPER_DIR "${MFEM_DIR}/../caliper" CACHE PATH "Path to Caliper")
 
 set(BLAS_INCLUDE_DIRS "" CACHE STRING "Path to BLAS headers.")
 set(BLAS_LIBRARIES "" CACHE STRING "The BLAS library.")
