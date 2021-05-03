@@ -1,6 +1,9 @@
 //Cas test d'une poutre en flexion avec solution analytique.
 //Calculs avec plusieurs maillage possible
 
+//GL: ajouter le papier de reference et une description plus detaillée
+//GL: revoir l'indentation du fichier (en utilisant emacs par exemple).
+
 #include <fstream>
 #include <iostream>
 
@@ -16,8 +19,10 @@ double ComputeGradNorm(Mesh &, GridFunction &);
 double ComputeEnergyNorm(Mesh &, GridFunction &,
 						 Coefficient &, Coefficient &);
 
+//GL: sur deux lignes, évite d'avoir plus de 90 caractère sur une seul ligne
 void Elasticy_mat(ElementTransformation &,const IntegrationPoint &, int, Coefficient &, 					  Coefficient &, DenseMatrix &);
 
+//GL: coquille à Exact ...
 double Norm_Energie_Eaxct();
 
 int main(int argc, char *argv[])
@@ -33,6 +38,7 @@ int iter = 0;
    int order;
    bool static_cond = false;
    int rep=5;
+   //GL: utiliser args.AddOption pour les paramètres d'entrée, pas "cin"
 	cout << "Ordre de la méthode: ";  cin >> order;
 	cout << "Pour plusieurs maillages tapez 1: ";  cin >> ref1;
 	if (ref1==1){
@@ -47,6 +53,7 @@ string const err_energy("err_flexion.txt");
 
 for (int ref_levels=1; ref_levels<((rep-2)*ref1+2); ref_levels++){ 
 
+   //GL: utiliser args.AddOption pour les paramètres d'entrée, pas "cin"
 if (ref1==0){
 	cout << "Combien de rafinement uniforme : "; cin >> ref_levels;}
 
@@ -208,6 +215,7 @@ if (ref1==0){
    a->RecoverFEMSolution(X, *b, x);
 
 
+  //GL: Ajouter une option en paramètre d'entrée qui permette de faire itératif ou direct
 //#ifndef MFEM_USE_SUITESPARSE
    // 11. Define a simple symmetric Gauss-Seidel preconditioner and use it to
    //     solve the system Ax=b with PCG.
@@ -323,8 +331,13 @@ return 0;
 }
 
 // Definition of exact solution
+//GL: commenter les formules et donner la référence/papier ou les trouver
 void sol_exact(const Vector &x, Vector &u)
 {
+//GL: Il faut que ces données pull_force, L, D, E, nu, I soit communes à toutes les routines.
+//GL: Une solution simple (mais pas idéale, on verra cela dans un second temps) est de faire des variables globales.
+//GL: Voir ex22p.cpp par exemple, les constantes sont définies au début comme des "static double".
+//GL: Si elles sont connues à la compilation, tu peux les définir comme des "constexpr double".
   double pull_force = -1.;
   double L = 8.0;
   double D =1.0;
@@ -332,7 +345,7 @@ void sol_exact(const Vector &x, Vector &u)
   double nu = 0.25;
   double I = D*D*D*D/12.;
 	double y = x(1)-D*0.5;
-
+//GL: expliquer ces transformations de manière adéquate.
 E=E/(1.-nu*nu); nu = nu/(1.-nu);
  //u(0) = -pull_force*y/(6.*E*I) * ((6.*L-3.*x(0))*x(0) + y*y*(2.+nu)- 1.5*D*D*(1.+nu));
  //u(1) = pull_force/(6.*E*I) * (3.*nu*y*y*(L-x(0)) + (3*L-x(0))*x(0)*x(0));
@@ -340,6 +353,8 @@ E=E/(1.-nu*nu); nu = nu/(1.-nu);
 	u(0) = -pull_force*y/(6.*E*I) * ((6.*L-3.*x(0))*x(0) + (2.+nu)*(y*y - D*D/4.));
 	u(1) = pull_force/(6.*E*I) * (3.*nu*y*y*(L-x(0)) + (3.*L-x(0))*x(0)*x(0)+ (4.+5.*nu)*D*D*x(0)/4.);
 }
+
+//GL: commenter les formules et donner la référence/papier ou les trouver
 void grad_exact(const Vector &x, DenseMatrix &grad)
 {
 	double pull_force = -1;

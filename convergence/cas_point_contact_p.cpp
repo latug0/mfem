@@ -1,6 +1,8 @@
 //Cas test d'un point de contact sur une plaque 2D. Avec solution excate
 //Calculs avec plusieurs maillage possible
 //Version Parallèle
+//GL: indente le fichier STP
+//GL: https://unix.stackexchange.com/questions/162057/can-i-have-emacs-automatically-indent-my-whole-code-after-it-is-all-written
 
 
 #include "mfem.hpp"
@@ -33,7 +35,8 @@ int main(int argc, char *argv[])
    
 	// Parse command-line options.
 	int order=1;
-	const char *mesh_file = "../data/carre.msh";
+	//GL: par défaut ./carre.msh plutôt
+	const char *mesh_file = "./carre.msh";
 	bool static_cond = false;
 	bool amg_elast = 0;
 	bool reorder_space = false;
@@ -51,8 +54,9 @@ int main(int argc, char *argv[])
 	args.AddOption(&reorder_space, "-nodes", "--by-nodes", "-vdim", "--by-vdim",
                   "Use byNODES ordering of vector space instead of byVDIM");
 
-
-int ref_levels = 9;
+	//GL: ref_levels à passer en paramètre via args.AddOption
+	//GL: par_ref_levels à passer aussi en paramètre via args.AddOption
+int ref_levels = 6;
 	//cout << "Combien de rafinement uniforme : "; cin >> ref_levels;
 
    args.Parse();
@@ -253,6 +257,8 @@ int ref_levels = 9;
 // Compute errors
 	//double ener_error = ComputeEnergyNorm(*mesh, x, lambda_func, mu_func);
 	VectorFunctionCoefficient sol_exact_coef(dim, sol_exact);
+	//GL: voir ex3p.cpp pour l'utilisation de computeL2Error, il
+	//GL: faut ajouter un "if(myid==0)"
 	double L2_error = x.ComputeL2Error(sol_exact_coef);
 	
 	cout << "\nL2 norm of error: " << L2_error << endl;
@@ -271,7 +277,10 @@ int ref_levels = 9;
    delete mesh;
    delete pmesh;
    MPI_Finalize();
-/*
+
+   //GL: partie paraview à décommenter et à placer au-dessus du
+   //GL: MPI_Finalize().
+   /*
 //Save in Praview format
 if (ref1==0){
 	GridFunction diff(fespace);
