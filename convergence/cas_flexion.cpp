@@ -81,9 +81,9 @@ int main(int argc, char *argv[])
     }
   args.PrintOptions(cout);
   
-  slope_ener.SetSize(rep-1,3);
-  slope_l2.SetSize(rep-1,3);
-  slope_grad.SetSize(rep-1,3);
+  slope_ener.SetSize(rep,3);
+  slope_l2.SetSize(rep,3);
+  slope_grad.SetSize(rep,3);
 
   string const err_energy("err_flexion.txt");
   ofstream err_energy_flux(err_energy.c_str());
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     //    quadrilateral, tetrahedral or hexahedral elements with the same code.
     int dim = mesh->Dimension();
   
-    for (int ref_levels=1; ref_levels<rep; ref_levels++){ 
+    for (int ref_levels=0; ref_levels<rep; ref_levels++){  
   
       // 5. Define a finite element space on the mesh. Here we use vector finite
       //    elements, i.e. dim copies of a scalar finite element space. The vector
@@ -107,8 +107,8 @@ int main(int argc, char *argv[])
       //    constructor. For NURBS meshes, we use the (degree elevated) NURBS space
       //    associated with the mesh nodes.
       FiniteElementCollection *fec;
-      FiniteElementSpace *fespace;
       fec = new H1_FECollection(order, dim);
+      FiniteElementSpace *fespace;
       fespace = new FiniteElementSpace(mesh, fec, dim);
       cout << "Numbers of elements: " << mesh->GetNE() <<endl;
       cout << "Number of finite element unknowns: " << fespace->GetTrueVSize()
@@ -276,30 +276,28 @@ int main(int argc, char *argv[])
       GridFunction diff(fespace);
       diff.ProjectCoefficient(sol_exact_coef);
       diff -= x;
+
   
-      ParaViewDataCollection paraview_dc("Flexion", mesh);
-      paraview_dc.SetPrefixPath("ParaView");
-      paraview_dc.SetLevelsOfDetail(order+1);
-      paraview_dc.SetCycle(iter);
-      paraview_dc.SetDataFormat(VTKFormat::BINARY);
-      paraview_dc.SetHighOrderOutput(true);
-      paraview_dc.SetTime(iter*1.0); // set the time
-      paraview_dc.RegisterField("numerical_solution",&x);
-      paraview_dc.RegisterField("diff-exact_solution",&diff);
-      paraview_dc.RegisterField("exact_solution",&ex);
-      paraview_dc.Save();	
-  
+      if (ref_levels == rep-1) {
+	ParaViewDataCollection paraview_dc("Flexion", mesh);
+	paraview_dc.SetPrefixPath("ParaView"); 
+	paraview_dc.SetLevelsOfDetail(order+1);
+	paraview_dc.SetCycle(iter);
+	paraview_dc.SetDataFormat(VTKFormat::BINARY);
+	paraview_dc.SetHighOrderOutput(true);
+	paraview_dc.SetTime(iter*1.0); // set the time
+	paraview_dc.RegisterField("numerical_solution",&x);
+	paraview_dc.RegisterField("diff-exact_solution",&diff);
+	paraview_dc.RegisterField("exact_solution",&ex);
+	paraview_dc.Save();	
+	delete mesh;
+      } else {
+	mesh->UniformRefinement();
+      }
       delete a;
       delete b;
-      if (fec) {
-  	delete fespace;
-  	delete fec;
-      }
-      //    refine the mesh to increase the resolution. In this example we do
-      //    'ref_levels' of uniform refinement. We choose 'ref_levels' to be the
-      //    largest number that gives a final mesh with no more than 5,000
-      //    elements.
-      mesh->UniformRefinement();
+      delete fespace; 
+      delete fec;
     }
     //Affichage des normes et pentes.
     cout<<endl;
