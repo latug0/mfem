@@ -536,7 +536,6 @@ add_custom_target(${MFEM_EXEC_PREREQUISITES_TARGET_NAME})
 set(MFEM_ALL_EXAMPLES_TARGET_NAME examples)
 add_mfem_target(${MFEM_ALL_EXAMPLES_TARGET_NAME} ${MFEM_ENABLE_EXAMPLES})
 add_subdirectory(examples EXCLUDE_FROM_ALL)
-add_subdirectory(convergence EXCLUDE_FROM_ALL)
 
 add_subdirectory(convergence EXCLUDE_FROM_ALL)
 
