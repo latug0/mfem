@@ -2679,7 +2679,9 @@ double GridFunction::ComputeL2Error(
 
    for (int i = 0; i < fes->GetNE(); i++)
    {
+      double loc_error = 0.;
       if (elems != NULL && (*elems)[i] == 0) { continue; }
+      
       fe = fes->GetFE(i);
       int intorder = 2*fe->GetOrder() + 3; // <----------
       const IntegrationRule *ir;
@@ -2701,8 +2703,9 @@ double GridFunction::ComputeL2Error(
       {
          const IntegrationPoint &ip = ir->IntPoint(j);
          T->SetIntPoint(&ip);
-         error += ip.weight * T->Weight() * (loc_errs(j) * loc_errs(j));
+         loc_error += ip.weight * T->Weight() * (loc_errs(j) * loc_errs(j));
       }
+      error += loc_error;
    }
 
    return (error < 0.0) ? -sqrt(-error) : sqrt(error);
