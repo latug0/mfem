@@ -268,17 +268,16 @@ int main(int argc, char *argv[])
       //col6: slope L2 error 	  col7: slope Ener error	col8: écart	
       err_energy_flux <<h<<" "<<L2_error<<" "<<ener_error<<" "<<err_grad
   		      <<" "<<slope_l2(iter,0)<<" "<<slope_ener(iter,0)<<" "<< pdc <<endl;
-      iter++;
-  
-      //Save in Praview format
-      GridFunction ex(fespace);
-      ex.ProjectCoefficient(sol_exact_coef);
-      GridFunction diff(fespace);
-      diff.ProjectCoefficient(sol_exact_coef);
-      diff -= x;
-
+ 
   
       if (ref_levels == rep-1) {
+	//Save in Paraview format
+	GridFunction ex(fespace);
+	ex.ProjectCoefficient(sol_exact_coef);
+	GridFunction diff(fespace);
+	diff.ProjectCoefficient(sol_exact_coef);
+	diff -= x;
+	
 	ParaViewDataCollection paraview_dc("Flexion", mesh);
 	paraview_dc.SetPrefixPath("ParaView"); 
 	paraview_dc.SetLevelsOfDetail(order+1);
@@ -292,12 +291,14 @@ int main(int argc, char *argv[])
 	paraview_dc.Save();	
 	delete mesh;
       } else {
+	// Refine mesh
 	mesh->UniformRefinement();
       }
       delete a;
       delete b;
       delete fespace; 
       delete fec;
+      iter++;
     }
     //Affichage des normes et pentes.
     cout<<endl;
