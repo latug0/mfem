@@ -2753,14 +2753,12 @@ void ElasticityIntegrator::ComputeElementFlux(
    const IntegrationRule &ir = fluxelem.GetNodes();
    const int fnd = ir.GetNPoints();
    flux.SetSize(fnd * tdim);
-
    DenseMatrix loc_data_mat(u.GetData(), dof, dim);
    for (int i = 0; i < fnd; i++)
    {
       const IntegrationPoint &ip = ir.IntPoint(i);
       el.CalcDShape(ip, dshape);
       MultAtB(loc_data_mat, dshape, gh);
-
       Trans.SetIntPoint(&ip);
       Mult(gh, Trans.InverseJacobian(), grad);
 
@@ -2835,18 +2833,17 @@ double ElasticityIntegrator::ComputeFluxEnergy(const FiniteElement &fluxelem,
       ir = &IntRules.Get(fluxelem.GetGeomType(), order);
    }
 
-   double energy = 0.0;
+   double energy = 0.0, error_global = 0.0;
 
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
+
       const IntegrationPoint &ip = ir->IntPoint(i);
       fluxelem.CalcShape(ip, shape);
-
       flux_mat.MultTranspose(shape, pointstress);
 
       Trans.SetIntPoint(&ip);
       double w = Trans.Weight() * ip.weight;
-
       M = mu->Eval(Trans, ip);
       if (lambda)
       {
@@ -2876,7 +2873,7 @@ double ElasticityIntegrator::ComputeFluxEnergy(const FiniteElement &fluxelem,
          // s entries: s_xx, s_yy, s_xy
          const double tr_e = (s[0] + s[1])/(2*(M + L));
          L *= tr_e;
-         pt_e = (0.25/M)*(s[0]*(s[0] - L) + s[1]*(s[1] - L) + 2*s[2]*s[2]);
+         pt_e = (0.5/M)*(s[0]*(s[0] - L) + s[1]*(s[1] - L) + 2*s[2]*s[2]);
       }
       else // (dim == 3)
       {
@@ -2889,7 +2886,6 @@ double ElasticityIntegrator::ComputeFluxEnergy(const FiniteElement &fluxelem,
 
       energy += w * pt_e;
    }
-
    return energy;
 }
 

@@ -92,9 +92,18 @@ int ThresholdRefiner::ApplyImpl(Mesh &mesh)
    if (num_elements >= max_elements) { return STOP; }
 
    const int NE = mesh.GetNE();
+   int NE_tot = NE;
+#ifdef MFEM_USE_MPI
+   ParMesh *pmesh = dynamic_cast<ParMesh*>(&mesh);
+   if (pmesh)
+   {
+      MPI_Allreduce(&NE, &NE_tot, 1, MPI_INT,
+                    MPI_SUM, MPI_COMM_WORLD);
+	}
+#endif // MFEM_USE_MPI
+
    const Vector &local_err = estimator.GetLocalErrors();
    MFEM_ASSERT(local_err.Size() == NE, "invalid size of local_err");
-
    const double total_err = GetNorm(local_err, mesh);
    if (total_err <= total_err_goal) { return STOP; }
 
@@ -113,7 +122,7 @@ int ThresholdRefiner::ApplyImpl(Mesh &mesh)
    {
       if (local_err(el) > threshold)
       {
-         marked_elements.Append(Refinement(el));
+         marked_elements.Append(Refinement(el,7));
       }
    }
 
@@ -125,13 +134,15 @@ int ThresholdRefiner::ApplyImpl(Mesh &mesh)
          for (int i = 0; i < marked_elements.Size(); i++)
          {
             Refinement &ref = marked_elements[i];
-            ref.ref_type = aniso_flags[ref.index];
+            //ref.ref_type = aniso_flags[ref.index];
+			ref.ref_type = 7; //isotropique refinement
          }
       }
    }
-
+//std::cout<<estimator.GetTotalError() <<" "<< threshold*sqrt(NE_tot)<<std::endl;
    num_marked_elements = mesh.ReduceInt(marked_elements.Size());
-   if (num_marked_elements == 0) { return STOP; }
+   if (estimator.GetTotalError() < threshold*sqrt(NE_tot))
+		 { return STOP; }
 
    mesh.GeneralRefinement(marked_elements, non_conforming, nc_limit);
    return CONTINUE + REFINED;

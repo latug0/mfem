@@ -3865,13 +3865,13 @@ double ZZErrorEstimator(BilinearFormIntegrator &blfi,
       nsd = ufes->GetMesh()->attributes.Max();
    }
 
-   double total_error = 0.0;
+   double total_error = 0.0, totnorm = 0.0;
    for (int s = 1; s <= nsd; s++)
    {
       // This calls the parallel version when u is a ParGridFunction
       u.ComputeFlux(blfi, flux, with_coeff, (with_subdomains ? s : -1));
 
-      for (int i = 0; i < nfe; i++)
+   for (int i = 0; i < nfe; i++)
       {
          if (with_subdomains && ufes->GetAttribute(i) != s) { continue; }
 
@@ -3884,10 +3884,9 @@ double ZZErrorEstimator(BilinearFormIntegrator &blfi,
          Transf = ufes->GetElementTransformation(i);
          blfi.ComputeElementFlux(*ufes->GetFE(i), *Transf, ul,
                                  *ffes->GetFE(i), fl, with_coeff);
+         fla -= fl;
 
-         fl -= fla;
-
-         double err = blfi.ComputeFluxEnergy(*ffes->GetFE(i), *Transf, fl,
+         double err = blfi.ComputeFluxEnergy(*ffes->GetFE(i), *Transf, fla,
                                              (aniso_flags ? &d_xyz : NULL));
 
          error_estimates(i) = std::sqrt(err);
@@ -3910,6 +3909,7 @@ double ZZErrorEstimator(BilinearFormIntegrator &blfi,
 
             (*aniso_flags)[i] = flag;
          }
+
       }
    }
 #ifdef MFEM_USE_MPI

@@ -26,7 +26,6 @@ void ZienkiewiczZhuEstimator::ComputeEstimates()
                                   anisotropic ? &aniso_flags : NULL,
                                   flux_averaging,
                                   with_coeff);
-
    current_sequence = solution->FESpace()->GetMesh()->GetSequence();
 }
 
