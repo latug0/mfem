@@ -3026,13 +3026,10 @@ void ElasticityIntegrator::AssembleElementMatrix(
    MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
 
 #ifdef MFEM_THREAD_SAFE
-   DenseMatrix dshape(dof, dim), gshape(dof, dim), pelmat(dof);
-   Vector divshape(dim*dof);
+   DenseMatrix dshape(dof, dim), gshape(dof, dim);
 #else
    dshape.SetSize(dof, dim);
    gshape.SetSize(dof, dim);
-   pelmat.SetSize(dof);
-   divshape.SetSize(dim*dof);
 #endif
 
    elmat.SetSize(dof * dim);
@@ -3055,8 +3052,6 @@ void ElasticityIntegrator::AssembleElementMatrix(
       Trans.SetIntPoint(&ip);
       w = ip.weight * Trans.Weight();
       Mult(dshape, Trans.InverseJacobian(), gshape);
-      MultAAt(gshape, pelmat);
-      gshape.GradToDiv (divshape);
 
       M = mu->Eval(Trans, ip);
       if (lambda)
@@ -3069,32 +3064,18 @@ void ElasticityIntegrator::AssembleElementMatrix(
          M = q_mu * M;
       }
 
-      if (L != 0.0)
-      {
-         AddMult_a_VVt(L * w, divshape, elmat);
-      }
+      for (int ii = 0; ii < dim; ii++)
+	for (int jj = 0; jj < dim; jj++)
+	  for (int kk = 0; kk < dof; kk++)
+	    for (int ll = 0; ll < dof; ll++)
+	      {
+		elmat(dof*ii+kk, dof*jj+ll) += 
+		  (L * w) * gshape(kk, ii) * gshape(ll, jj) +
+		  (M * w) * gshape(kk, jj) * gshape(ll, ii); 
 
-      if (M != 0.0)
-      {
-         for (int d = 0; d < dim; d++)
-         {
-            for (int k = 0; k < dof; k++)
-               for (int l = 0; l < dof; l++)
-               {
-                  elmat (dof*d+k, dof*d+l) += (M * w) * pelmat(k, l);
-               }
-         }
-         for (int ii = 0; ii < dim; ii++)
-            for (int jj = 0; jj < dim; jj++)
-            {
-               for (int kk = 0; kk < dof; kk++)
-                  for (int ll = 0; ll < dof; ll++)
-                  {
-                     elmat(dof*ii+kk, dof*jj+ll) +=
-                        (M * w) * gshape(kk, jj) * gshape(ll, ii);
-                  }
-            }
-      }
+		elmat(dof*ii+kk, dof*ii+ll) +=  
+		  (M * w) * gshape(kk, jj) * gshape(ll, jj);
+	      }
    }
 }
 
