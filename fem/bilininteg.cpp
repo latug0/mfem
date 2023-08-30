@@ -3072,7 +3072,13 @@ void ElasticityIntegrator::AssembleElementMatrix(
 		elmat(dof*ii+kk, dof*jj+ll) += 
 		  (L * w) * gshape(kk, ii) * gshape(ll, jj) +
 		  (M * w) * gshape(kk, jj) * gshape(ll, ii); 
+	      }
 
+      for (int ii = 0; ii < dim; ii++)
+	for (int kk = 0; kk < dof; kk++)
+	  for (int ll = 0; ll < dof; ll++)
+	    for (int jj = 0; jj < dim; jj++)
+	      {
 		elmat(dof*ii+kk, dof*ii+ll) +=  
 		  (M * w) * gshape(kk, jj) * gshape(ll, jj);
 	      }
