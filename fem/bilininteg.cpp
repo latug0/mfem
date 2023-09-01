@@ -3019,8 +3019,8 @@ void VectorDiffusionIntegrator::AssembleElementVector(
 void ElasticityIntegrator::AssembleElementMatrix(
    const FiniteElement &el, ElementTransformation &Trans, DenseMatrix &elmat)
 {
-   int dof = el.GetDof();
-   int dim = el.GetDim();
+   const int dof = el.GetDof();
+   const int dim = el.GetDim();
    double w, L, M;
 
    MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
@@ -3041,14 +3041,24 @@ void ElasticityIntegrator::AssembleElementMatrix(
       ir = &IntRules.Get(el.GetGeomType(), order);
    }
 
+   Mesh *mesh = Trans.mesh;
+   if (geom == NULL)
+     geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS);
+   if (maps == NULL)
+     maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
+   
    elmat = 0.0;
-
-   for (int i = 0; i < ir -> GetNPoints(); i++)
+   nq =ir->GetNPoints();
+   for (int i = 0; i < nq; i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
-
-      el.CalcDShape(ip, dshape);
-
+      
+      for (int j = 0; j < dof; j++)
+	for (int d = 0; d < dim; d++)
+	  dshape(j,d) = maps->Gt[j+dof*(i+nq*d)] ;
+      //	  dshape(j,d) = maps->G[i+nq*(d+dim*j)];
+      
+      //      el.CalcDShape(ip, dshape);
       Trans.SetIntPoint(&ip);
       w = ip.weight * Trans.Weight();
       Mult(dshape, Trans.InverseJacobian(), gshape);
@@ -3065,6 +3075,15 @@ void ElasticityIntegrator::AssembleElementMatrix(
       }
 
       for (int ii = 0; ii < dim; ii++)
+	for (int kk = 0; kk < dof; kk++)
+	  for (int ll = 0; ll < dof; ll++)
+	    for (int jj = 0; jj < dim; jj++)
+	      {
+		elmat(dof*ii+kk, dof*ii+ll) +=  
+		  (M * w) * gshape(kk, jj) * gshape(ll, jj);
+	      }
+
+      for (int ii = 0; ii < dim; ii++)
 	for (int jj = 0; jj < dim; jj++)
 	  for (int kk = 0; kk < dof; kk++)
 	    for (int ll = 0; ll < dof; ll++)
@@ -3074,14 +3093,6 @@ void ElasticityIntegrator::AssembleElementMatrix(
 		  (M * w) * gshape(kk, jj) * gshape(ll, ii); 
 	      }
 
-      for (int ii = 0; ii < dim; ii++)
-	for (int kk = 0; kk < dof; kk++)
-	  for (int ll = 0; ll < dof; ll++)
-	    for (int jj = 0; jj < dim; jj++)
-	      {
-		elmat(dof*ii+kk, dof*ii+ll) +=  
-		  (M * w) * gshape(kk, jj) * gshape(ll, jj);
-	      }
    }
 }
 

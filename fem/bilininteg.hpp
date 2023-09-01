@@ -3007,12 +3007,10 @@ private:
 #endif
 
    // PA extension
-   const DofToQuad *maps;         ///< Not owned
-   const GeometricFactors *geom;  ///< Not owned
-   int dim, sdim, ne, dofs1D, quad1D;
+   const DofToQuad *maps = NULL;         ///< Not owned
+   const GeometricFactors *geom = NULL;  ///< Not owned
+   int dim, ne, nq, dof;
    Vector pa_data;
-   const DofToQuad *mapsO;         ///< Not owned. DOF-to-quad map, open.
-   const DofToQuad *mapsC;         ///< Not owned. DOF-to-quad map, closed.
 
 public:
    ElasticityIntegrator(Coefficient &l, Coefficient &m)

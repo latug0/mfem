@@ -7,6 +7,7 @@
 //
 
 #include "mfem.hpp"
+#include "fem/bilininteg.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -159,12 +160,15 @@ int main(int argc, char *argv[])
 {
    //    Parse command-line options.
    const char *mesh_file = "square_2mat_per.msh";
+   bool pa = false;
    int order = 1;
    int tcase = 1;
    bool static_cond = false;
    bool visualization = 1;
 
    OptionsParser args(argc, argv);
+   args.AddOption(&pa, "-pa", "--partial-assembly", "-no-pa",
+                  "--no-partial-assembly", "Enable Partial Assembly.");
    args.AddOption(&mesh_file, "-m", "--mesh",
                   "Mesh file to use.");
    args.AddOption(&order, "-o", "--order",
@@ -318,6 +322,7 @@ int main(int argc, char *argv[])
 //   }
    
    BilinearForm *a = new BilinearForm(fespace);
+   if (pa) { a->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    a->AddDomainIntegrator(new ElasticityIntegrator(lambda_func,mu_func));
    a->Assemble();
   
