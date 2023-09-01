@@ -14,6 +14,10 @@
 #include "fem.hpp"
 #include <cmath>
 #include <algorithm>
+#include "general/forall.hpp"
+#include "fem/bilininteg.hpp"
+#include "fem/gridfunc.hpp"
+#include "fem/qfunction.hpp"
 
 using namespace std;
 
@@ -3021,6 +3025,8 @@ void ElasticityIntegrator::AssembleElementMatrix(
 {
    const int dof = el.GetDof();
    const int dim = el.GetDim();
+   const int e = Trans.ElementNo;
+   auto LM = Reshape(pa_data.Write(), 2, nq, ne);
    double w, L, M;
 
    MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
@@ -3041,38 +3047,31 @@ void ElasticityIntegrator::AssembleElementMatrix(
       ir = &IntRules.Get(el.GetGeomType(), order);
    }
 
+   cerr << "ELN: " << e << std::endl;
+   cerr << "DEB: " << LM(0,0,0) << std::endl;
+   cerr << "DEB: " << LM(1,0,0) << std::endl;
+   cerr << "LI: " << __LINE__ << std::endl;
    Mesh *mesh = Trans.mesh;
-   if (geom == NULL)
+   if (geom == NULL) 
      geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS);
-   if (maps == NULL)
+   if (maps == NULL) 
      maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
-   
+   cerr << "LI: " << __LINE__ << std::endl;
    elmat = 0.0;
    nq =ir->GetNPoints();
    for (int i = 0; i < nq; i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
       
+
       for (int j = 0; j < dof; j++)
 	for (int d = 0; d < dim; d++)
-	  dshape(j,d) = maps->Gt[j+dof*(i+nq*d)] ;
-      //	  dshape(j,d) = maps->G[i+nq*(d+dim*j)];
+      	  dshape(j,d) = maps->G[i+nq*(d+dim*j)];
       
-      //      el.CalcDShape(ip, dshape);
-      Trans.SetIntPoint(&ip);
-      w = ip.weight * Trans.Weight();
       Mult(dshape, Trans.InverseJacobian(), gshape);
 
-      M = mu->Eval(Trans, ip);
-      if (lambda)
-      {
-         L = lambda->Eval(Trans, ip);
-      }
-      else
-      {
-         L = q_lambda * M;
-         M = q_mu * M;
-      }
+      const double LW = LM(1,i,e);
+      const double MW = LM(0,i,e);
 
       for (int ii = 0; ii < dim; ii++)
 	for (int kk = 0; kk < dof; kk++)
@@ -3080,8 +3079,9 @@ void ElasticityIntegrator::AssembleElementMatrix(
 	    for (int jj = 0; jj < dim; jj++)
 	      {
 		elmat(dof*ii+kk, dof*ii+ll) +=  
-		  (M * w) * gshape(kk, jj) * gshape(ll, jj);
+		  MW * gshape(kk, jj) * gshape(ll, jj);
 	      }
+
 
       for (int ii = 0; ii < dim; ii++)
 	for (int jj = 0; jj < dim; jj++)
@@ -3089,11 +3089,13 @@ void ElasticityIntegrator::AssembleElementMatrix(
 	    for (int ll = 0; ll < dof; ll++)
 	      {
 		elmat(dof*ii+kk, dof*jj+ll) += 
-		  (L * w) * gshape(kk, ii) * gshape(ll, jj) +
-		  (M * w) * gshape(kk, jj) * gshape(ll, ii); 
+		  LW * gshape(kk, ii) * gshape(ll, jj) +
+		  MW * gshape(kk, jj) * gshape(ll, ii); 
 	      }
 
-   }
+   } 
+   cerr << "LI: " << __LINE__ << std::endl;
+
 }
 
 void ElasticityIntegrator::ComputeElementFlux(

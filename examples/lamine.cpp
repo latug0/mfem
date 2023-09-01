@@ -10,6 +10,10 @@
 #include "fem/bilininteg.hpp"
 #include <fstream>
 #include <iostream>
+#include "general/forall.hpp"
+#include "fem/bilininteg.hpp"
+#include "fem/gridfunc.hpp"
+#include "fem/qfunction.hpp"
 
 using namespace std;
 using namespace mfem;
@@ -27,6 +31,8 @@ void ComputeAvg(const GridFunction &gf, Vector &avg);
 void ComputeAvgPerAtt(const GridFunction &gf, Vector &avg, Vector &vol);
 void ComputeAvgStressStrain(const GridFunction &u, Coefficient &lambda, Coefficient &mu,
 			    int si, int sj, Vector &strain, Vector &stress, Vector &vol);
+
+
 
 class DiagCoefficient : public Coefficient
 {
@@ -323,7 +329,10 @@ int main(int argc, char *argv[])
    
    BilinearForm *a = new BilinearForm(fespace);
    if (pa) { a->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
-   a->AddDomainIntegrator(new ElasticityIntegrator(lambda_func,mu_func));
+   auto ei = new ElasticityIntegrator(lambda_func,mu_func);
+   a->AddDomainIntegrator(ei);
+   const FiniteElementSpace &fes = *fespace;
+   ei->AssemblePA(fes);
    a->Assemble();
   
    // Set up the right-hand side of the FEM linear system.
