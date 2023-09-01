@@ -3026,9 +3026,9 @@ void ElasticityIntegrator::AssembleElementMatrix(
    const int dof = el.GetDof();
    const int dim = el.GetDim();
    const int e = Trans.ElementNo;
-   auto LM = Reshape(pa_data.Write(), 2, nq, ne);
+   auto LM = Reshape(pa_data.Write(), 2+dim*dim, nq, ne);
    double w, L, M;
-
+   
    MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
 
 #ifdef MFEM_THREAD_SAFE
@@ -3039,7 +3039,6 @@ void ElasticityIntegrator::AssembleElementMatrix(
 #endif
 
    elmat.SetSize(dof * dim);
-
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
    {
@@ -3047,31 +3046,33 @@ void ElasticityIntegrator::AssembleElementMatrix(
       ir = &IntRules.Get(el.GetGeomType(), order);
    }
 
-   cerr << "ELN: " << e << std::endl;
-   cerr << "DEB: " << LM(0,0,0) << std::endl;
-   cerr << "DEB: " << LM(1,0,0) << std::endl;
-   cerr << "LI: " << __LINE__ << std::endl;
    Mesh *mesh = Trans.mesh;
    if (geom == NULL) 
      geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS);
    if (maps == NULL) 
      maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
-   cerr << "LI: " << __LINE__ << std::endl;
    elmat = 0.0;
    nq =ir->GetNPoints();
    for (int i = 0; i < nq; i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
       
-
       for (int j = 0; j < dof; j++)
 	for (int d = 0; d < dim; d++)
       	  dshape(j,d) = maps->G[i+nq*(d+dim*j)];
-      
-      Mult(dshape, Trans.InverseJacobian(), gshape);
 
+      DenseMatrix invJ(&LM(2,i,e),dim,dim);
       const double LW = LM(1,i,e);
       const double MW = LM(0,i,e);
+
+      //            Mult(dshape, invJ, gshape);
+      for (int i = 0; i < dof; i++)
+	for (int j = 0; j < dim; j++) {
+	  gshape(i,j) = 0.;
+	  for (int k = 0; k < dim; k++)
+	    gshape(i,j) += dshape(i,k) * invJ(k,j);
+	} 
+
 
       for (int ii = 0; ii < dim; ii++)
 	for (int kk = 0; kk < dof; kk++)
@@ -3094,7 +3095,6 @@ void ElasticityIntegrator::AssembleElementMatrix(
 	      }
 
    } 
-   cerr << "LI: " << __LINE__ << std::endl;
 
 }
 
