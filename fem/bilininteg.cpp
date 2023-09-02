@@ -3019,6 +3019,87 @@ void VectorDiffusionIntegrator::AssembleElementVector(
    }
 }
 
+#ifdef OLD
+  void ElasticityIntegrator::AssembleElementMatrix(
+   const FiniteElement &el, ElementTransformation &Trans, DenseMatrix &elmat)
+{
+   const int dof = el.GetDof();
+   const int dim = el.GetDim();
+   double w, L, M;
+
+   MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
+
+#ifdef MFEM_THREAD_SAFE
+   DenseMatrix dshape(dof, dim), gshape(dof, dim);
+#else
+   dshape.SetSize(dof, dim);
+   gshape.SetSize(dof, dim);
+#endif
+
+   elmat.SetSize(dof * dim);
+
+   const IntegrationRule *ir = IntRule;
+   if (ir == NULL)
+   {
+      int order = 2 * Trans.OrderGrad(&el); // correct order?
+      ir = &IntRules.Get(el.GetGeomType(), order);
+   }
+
+   Mesh *mesh = Trans.mesh;
+   if (geom == NULL)
+     geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS);
+   if (maps == NULL)
+     maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
+   
+   elmat = 0.0;
+   nq =ir->GetNPoints();
+   for (int i = 0; i < nq; i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      
+      for (int j = 0; j < dof; j++)
+	for (int d = 0; d < dim; d++)
+	  dshape(j,d) = maps->Gt[j+dof*(i+nq*d)] ;
+      //	  dshape(j,d) = maps->G[i+nq*(d+dim*j)];
+      
+      //      el.CalcDShape(ip, dshape);
+      Trans.SetIntPoint(&ip);
+      w = ip.weight * Trans.Weight();
+      Mult(dshape, Trans.InverseJacobian(), gshape);
+
+      M = mu->Eval(Trans, ip);
+      if (lambda)
+      {
+         L = lambda->Eval(Trans, ip);
+      }
+      else
+      {
+         L = q_lambda * M;
+         M = q_mu * M;
+      }
+
+      for (int ii = 0; ii < dim; ii++)
+	for (int kk = 0; kk < dof; kk++)
+	  for (int ll = 0; ll < dof; ll++)
+	    for (int jj = 0; jj < dim; jj++)
+	      {
+		elmat(dof*ii+kk, dof*ii+ll) +=  
+		  (M * w) * gshape(kk, jj) * gshape(ll, jj);
+	      }
+
+      for (int ii = 0; ii < dim; ii++)
+	for (int jj = 0; jj < dim; jj++)
+	  for (int kk = 0; kk < dof; kk++)
+	    for (int ll = 0; ll < dof; ll++)
+	      {
+		elmat(dof*ii+kk, dof*jj+ll) += 
+		  (L * w) * gshape(kk, ii) * gshape(ll, jj) +
+		  (M * w) * gshape(kk, jj) * gshape(ll, ii); 
+	      }
+
+   }
+}
+#endif
 
 void ElasticityIntegrator::AssembleElementMatrix(
    const FiniteElement &el, ElementTransformation &Trans, DenseMatrix &elmat)
@@ -3026,8 +3107,7 @@ void ElasticityIntegrator::AssembleElementMatrix(
    const int dof = el.GetDof();
    const int dim = el.GetDim();
    const int e = Trans.ElementNo;
-   auto LM = Reshape(pa_data.Write(), 2+dim*dim, nq, ne);
-   double w, L, M;
+   auto LM = Reshape(pa_data.Read(), 2+dim*dim, nq, ne);
    
    MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
 
@@ -3038,6 +3118,7 @@ void ElasticityIntegrator::AssembleElementMatrix(
    gshape.SetSize(dof, dim);
 #endif
 
+   std::cerr <<  "LO:" << __LINE__ << std::endl;
    elmat.SetSize(dof * dim);
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)
@@ -3051,33 +3132,30 @@ void ElasticityIntegrator::AssembleElementMatrix(
      geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS);
    if (maps == NULL) 
      maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
+
    elmat = 0.0;
    nq =ir->GetNPoints();
    for (int i = 0; i < nq; i++)
    {
-      const IntegrationPoint &ip = ir->IntPoint(i);
-      
       for (int j = 0; j < dof; j++)
 	for (int d = 0; d < dim; d++)
       	  dshape(j,d) = maps->G[i+nq*(d+dim*j)];
 
-      DenseMatrix invJ(&LM(2,i,e),dim,dim);
       const double LW = LM(1,i,e);
       const double MW = LM(0,i,e);
 
-      //            Mult(dshape, invJ, gshape);
-      for (int i = 0; i < dof; i++)
-	for (int j = 0; j < dim; j++) {
-	  gshape(i,j) = 0.;
-	  for (int k = 0; k < dim; k++)
-	    gshape(i,j) += dshape(i,k) * invJ(k,j);
+      for (int ii = 0; ii < dof; ii++)
+	for (int jj = 0; jj < dim; jj++) {
+	  gshape(ii,jj) = 0.;
+	  for (int kk = 0; kk < dim; kk++)
+	    gshape(ii,jj) += dshape(ii,kk) * LM(2+kk+jj*dim,i,e); 
 	} 
 
 
       for (int ii = 0; ii < dim; ii++)
-	for (int kk = 0; kk < dof; kk++)
-	  for (int ll = 0; ll < dof; ll++)
-	    for (int jj = 0; jj < dim; jj++)
+	for (int jj = 0; jj < dim; jj++)
+	  for (int kk = 0; kk < dof; kk++)
+	    for (int ll = 0; ll < dof; ll++)
 	      {
 		elmat(dof*ii+kk, dof*ii+ll) +=  
 		  MW * gshape(kk, jj) * gshape(ll, jj);
@@ -3093,7 +3171,6 @@ void ElasticityIntegrator::AssembleElementMatrix(
 		  LW * gshape(kk, ii) * gshape(ll, jj) +
 		  MW * gshape(kk, jj) * gshape(ll, ii); 
 	      }
-
    } 
 
 }
