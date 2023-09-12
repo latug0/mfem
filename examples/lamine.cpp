@@ -338,7 +338,6 @@ int main(int argc, char *argv[])
    std::cerr <<  "LI:" << __LINE__ << std::endl;
    if (!pa) ei->AssemblePA(*fespace);
    a->Assemble();
-   std::cerr <<  "end AssemblePA call" << std::endl;
   
    // Set up the right-hand side of the FEM linear system.
    LinearForm rhs(fespace);

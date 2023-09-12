@@ -34,7 +34,6 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    dim = el.GetDim();
    dof = el.GetDof();
    nq = ir->GetNPoints();
-   //   dim = mesh->Dimension();
    MFEM_VERIFY(dim == 2 || dim == 3, "");
 
    ne = fes.GetNE();
@@ -43,12 +42,7 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    pa_data.SetSize((2+dim*dim) * nq * ne, mt);
    QuadratureSpace qs(*mesh, *ir);
 
-
-   //   const auto W = Reshape(ir->GetWeights().Read(), nq);
-   //   const auto detJ = Reshape(geom->detJ.Read(), nq, ne);
-   //   const auto J = Reshape(geom->J.Read(), nq, ne);
    auto LM = Reshape(pa_data.Write(), 2+dim*dim, nq, ne);
-   //   auto D = Reshape(pa_data.Write(), nq, ne);
    mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
      {
        for (int i = 0; i < ir -> GetNPoints(); i++) {
@@ -66,14 +60,11 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
        }
      });
 
-   std::cerr <<  "OK setup" << std::endl;
 }
 
 void  ElasticityIntegrator::AssembleDiagonalPA(Vector& diag)
 {
-  std::cerr <<  "Oups" << std::endl;
-  exit(0);
-  
+  MFEM_ABORT("ElasticityIntegrator::AssembleDiagonalPA not defined");
 }
 
 
@@ -82,10 +73,8 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
   auto LM = Reshape(pa_data.Read(), 2+dim*dim, nq, ne);
   auto X = Reshape(x_.Read(), dof, dim, ne);
   auto Y = Reshape(y_.ReadWrite(), dof, dim, ne);
-  std::cerr <<  "AddMultPA call" << std::endl;
-//  mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
-//  {
-  for (int e=0; e< ne; e++) 
+
+  mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
   {
     DenseMatrix elmat;
     elmat.SetSize(dof * dim);
@@ -95,7 +84,8 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 	DenseMatrix dshape(dof, dim), gshape(dof, dim);
 	for (int j = 0; j < dof; j++)
 	  for (int d = 0; d < dim; d++)
-	dshape(j,d) = maps->G[i+nq*(d+dim*j)];
+	    dshape(j,d) = maps->Gt[j+dof*(i+nq*d)] ;
+	    //    dshape(j,d) = maps->G[i+nq*(d+dim*j)];
 	
 	const double LW = LM(1,i,e);
 	const double MW = LM(0,i,e);
@@ -120,8 +110,6 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 	      }
       }
   }
-  std::cerr <<  "End AddMultPA" << std::endl;
-
 }
 
 } // namespace mfem
