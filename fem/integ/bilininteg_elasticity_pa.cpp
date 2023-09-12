@@ -108,8 +108,8 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 		  (LW * gshape(kk, ii) * gshape(ll, jj) +
 		   MW * gshape(kk, jj) * gshape(ll, ii)); 
 	      }
-      }
-  }
+      }  
+  });
 }
 
 } // namespace mfem

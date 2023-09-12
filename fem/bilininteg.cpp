@@ -3118,7 +3118,6 @@ void ElasticityIntegrator::AssembleElementMatrix(
    gshape.SetSize(dof, dim);
 #endif
 
-   std::cerr <<  "LO:" << __LINE__ << std::endl;
    elmat.SetSize(dof * dim);
    const IntegrationRule *ir = IntRule;
    if (ir == NULL)

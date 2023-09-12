@@ -310,32 +310,15 @@ int main(int argc, char *argv[])
       Element *el = mesh->GetElement(i);
       int nv = el->GetNVertices();
       int *v = el->GetVertices();
-      //      cout << "elt " << i << " : " << i << "\n";
       for (int j = 0; j < nv; j++) {
 	const double *coord = mesh->GetVertex(v[j]);
-	//	cout << "v " << coord[0] << " " << coord[1] << " " << coord[2] << "\n";
- 
       }
    }
-//   for (int i = 0; i < mesh->GetNBE(); i++)
-//   {
-//      Element *el = mesh->GetBdrElement(i);
-//      int *v = el->GetVertices();
-//      int nv = el->GetNVertices();
-//      for (int j = 0; j < nv; j++)
-//      {
-//      }
-//   }
-   
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
    BilinearForm *a = new BilinearForm(fespace);
    if (pa) { a->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    auto ei = new ElasticityIntegrator(lambda_func,mu_func);
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
    a->AddDomainIntegrator(ei);
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
    const FiniteElementSpace &fes = *fespace;
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
    if (!pa) ei->AssemblePA(*fespace);
    a->Assemble();
   
@@ -351,7 +334,6 @@ int main(int argc, char *argv[])
    OperatorPtr A;
    Vector B, X;
    a->FormLinearSystem(ess_tdof_list, x, rhs, A, X, B);
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
 
    // Define a simple symmetric Gauss-Seidel preconditioner and use it to
    // solve the system Ax=b with PCG.
@@ -360,11 +342,9 @@ int main(int argc, char *argv[])
    CG(*A, B, X, 1, 800, 1e-24, 0.0);
    //CG(A, B, X, 1, 500, 1e-24, 0.0);
 
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
    //  Recover the solution as a finite element grid function.
    a->RecoverFEMSolution(X, rhs, x);
    
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
    //  Save the results
    {
      ParaViewDataCollection paraview_dc("per", mesh);
@@ -459,7 +439,6 @@ int main(int argc, char *argv[])
      exit (1);
      break;
    }
-   std::cerr <<  "LI:" << __LINE__ << std::endl;
    VectorFunctionCoefficient sol_coef (dim, sol_exact);
    double errorL2 = x.ComputeL2Error(sol_coef);
    cerr<<"\ntcase " << tcase << " -- L2 norm: " << errorL2 << endl;
