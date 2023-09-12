@@ -73,7 +73,7 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
   auto LM = Reshape(pa_data.Read(), 2+dim*dim, nq, ne);
   auto X = Reshape(x_.Read(), dof, dim, ne);
   auto Y = Reshape(y_.ReadWrite(), dof, dim, ne);
-  std::cout << "nq : " << nq << "\n";
+
   mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
   {
     for (int i = 0; i < nq; i++)
@@ -83,28 +83,25 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 	const double LW = LM(1,i,e);
 	const double MW = LM(0,i,e);
 	
-	for (int kk = 0; kk < dim; kk++) 
-	  for (int ll = 0; ll < dof; ll++) {
-	    register double accu = 0.;
-	    for (int ii = 0; ii < dim; ii++)
-	      accu += maps->Gt[ll+dof*(i+nq*ii)] * LM(2+ii+kk*dim,i,e);
-	    gshape(ll,kk) = accu;
-	  } 
+	for (int ii = 0; ii < dim; ii++)
+	  for (int kk = 0; kk < dim; kk++) 
+	    for (int ll = 0; ll < dof; ll++) 
+	      gshape(ll,kk) += maps->Gt[ll+dof*(i+nq*ii)] * LM(2+ii+kk*dim,i,e);
 	
 	for (int ii = 0; ii < dim; ii++)
-	    for (int jj = 0; jj < dim; jj++) {
-	      double contribB = 0.;
-	      double contribA = 0;
-	      double contribC = 0;
-	      for (int ll = 0; ll < dof; ll++) {
-		contribA += X(ll,ii,e) * gshape(ll, jj);
-		contribB += X(ll,jj,e) * gshape(ll, jj);
-		contribC += X(ll,jj,e) * gshape(ll, ii); 
-	      }
-	      for (int kk = 0; kk < dof; kk++) {
-		Y(kk,ii,e) += MW * gshape(kk, jj) * (contribA + contribC) + LW * gshape(kk, ii) * contribB ;
-	      }
+	  for (int jj = 0; jj < dim; jj++) {
+	    double contribB = 0.;
+	    double contribA = 0;
+	    double contribC = 0;
+	    for (int ll = 0; ll < dof; ll++) {
+	      contribA += X(ll,ii,e) * gshape(ll, jj);
+	      contribB += X(ll,jj,e) * gshape(ll, jj);
+	      contribC += X(ll,jj,e) * gshape(ll, ii); 
 	    }
+	    for (int kk = 0; kk < dof; kk++) {
+	      Y(kk,ii,e) += MW * gshape(kk, jj) * (contribA + contribC) + LW * gshape(kk, ii) * contribB ;
+	    }
+	  }
       }  
   });
 }
