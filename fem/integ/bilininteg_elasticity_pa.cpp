@@ -74,10 +74,10 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
   auto X = Reshape(x_.Read(), dof, dim, ne);
   auto Y = Reshape(y_.ReadWrite(), dof, dim, ne);
 
-  mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
-  {
-    for (int i = 0; i < nq; i++)
+  mfem::forall(ne*nq, [=] MFEM_HOST_DEVICE (int q_global)
       {
+	const int e = q_global / nq;
+	const int i = q_global % nq;
 	DenseMatrix gshape(dof, dim);
 
 	const double LW = LM(1,i,e);
@@ -99,11 +99,11 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 	      contribC += X(ll,jj,e) * gshape(ll, ii); 
 	    }
 	    for (int kk = 0; kk < dof; kk++) {
-	      Y(kk,ii,e) += MW * gshape(kk, jj) * (contribA + contribC) + LW * gshape(kk, ii) * contribB ;
+	      Y(kk,ii,e) += MW * gshape(kk, jj) * (contribA + contribC) +
+		LW * gshape(kk, ii) * contribB ;
 	    }
 	  }
-      }  
-  });
+      });
 }
 
 } // namespace mfem
