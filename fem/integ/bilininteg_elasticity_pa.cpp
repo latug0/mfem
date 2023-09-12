@@ -92,7 +92,6 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 	  } 
 	
 	for (int ii = 0; ii < dim; ii++)
-	  for (int kk = 0; kk < dof; kk++) {
 	    for (int jj = 0; jj < dim; jj++) {
 	      double contribB = 0.;
 	      double contribA = 0;
@@ -102,9 +101,10 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 		contribB += X(ll,jj,e) * gshape(ll, jj);
 		contribC += X(ll,jj,e) * gshape(ll, ii); 
 	      }
-	      Y(kk,ii,e) += MW * gshape(kk, jj) * (contribA + contribC) + LW * gshape(kk, ii) * contribB ;
+	      for (int kk = 0; kk < dof; kk++) {
+		Y(kk,ii,e) += MW * gshape(kk, jj) * (contribA + contribC) + LW * gshape(kk, ii) * contribB ;
+	      }
 	    }
-	  }
       }  
   });
 }
