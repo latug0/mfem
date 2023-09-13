@@ -13,6 +13,7 @@
 #include "../bilininteg.hpp"
 #include "../gridfunc.hpp"
 #include "../qfunction.hpp"
+#include "../fespace.hpp"
 
 namespace mfem
 {
@@ -31,6 +32,11 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    if (maps == NULL) 
      maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
 
+   QuadratureSpace qs(*mesh, *ir);
+   CoefficientVector coeffmu(qs, CoefficientStorage::COMPRESSED);
+   CoefficientVector coefflambda(qs, CoefficientStorage::COMPRESSED);
+   coeffmu.Project(*mu);
+   coefflambda.Project(*lambda);
    dim = el.GetDim();
    dof = el.GetDof();
    nq = ir->GetNPoints();
@@ -40,23 +46,61 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS, mt);
 
    pa_data.SetSize((2+dim*dim) * nq * ne, mt);
-   QuadratureSpace qs(*mesh, *ir);
 
+
+   auto J = Reshape(geom->J.Read(), nq, dim, dim, ne);
+   auto MU = Reshape(coeffmu.Read(),nq,ne);
+   auto LAMBDA = Reshape(coefflambda.Read(),nq,ne);
    auto LM = Reshape(pa_data.Write(), 2+dim*dim, nq, ne);
+   auto W = ir->GetWeights().Read();
    mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
      {
        for (int i = 0; i < ir -> GetNPoints(); i++) {
 	 ElementTransformation *Trans = fes.GetElementTransformation(e);
 	 const IntegrationPoint &ip = ir->IntPoint(i);
 	 Trans->SetIntPoint(&ip);
-	 double w = ip.weight * Trans->Weight();
-	 LM(0,i,e) = w * mu->Eval(*Trans, ip);
-	 LM(1,i,e) = w * lambda->Eval(*Trans, ip);
 	 const DenseMatrix &invJ = Trans->InverseJacobian();
-	 for (int d1=0; d1<dim; d1++)
-	   for (int d2=0; d2<dim; d2++) {
-	     LM(2+d2+d1*dim,i,e) = invJ(d2,d1);
-	   }
+	 if (dim == 3) {
+	   const double J11 = J(i,0,0,e);
+	   const double J21 = J(i,1,0,e);
+	   const double J31 = J(i,2,0,e);
+	   const double J12 = J(i,0,1,e);
+	   const double J22 = J(i,1,1,e);
+	   const double J32 = J(i,2,1,e);
+	   const double J13 = J(i,0,2,e);
+	   const double J23 = J(i,1,2,e);
+	   const double J33 = J(i,2,2,e);
+	   const double detJ = J11 * (J22 * J33 - J32 * J23) -
+	     J21 * (J12 * J33 - J32 * J13) +
+	     J31 * (J12 * J23 - J22 * J13);
+	   LM(0,i,e) = W[i] * detJ * MU(i,e);
+	   LM(1,i,e) = W[i] * detJ * LAMBDA(i,e);
+	   //	   std::cout << "weight "<< W[i] <<  " = " << ip.weight << "\n";
+	   //	   std::cout << " transweight " << Trans->Weight() << " = " << detJ << "\n";
+	   for (int d1=0; d1<dim; d1++)
+	     for (int d2=0; d2<dim; d2++) {
+	       LM(2+d2+d1*dim,i,e) = invJ(d2,d1);
+	     }
+	 } else if (dim == 2) {
+            const double J11 = J(i,0,0,e);
+            const double J21 = J(i,1,0,e);
+            const double J12 = J(i,0,1,e);
+            const double J22 = J(i,1,1,e);
+            const double detJ = ((J11*J22)-(J21*J12));
+            const double i_detJ = 1/detJ;
+	    LM(0,i,e) = W[i] * detJ * MU(i,e);
+	    LM(1,i,e) = W[i] * detJ * LAMBDA(i,e);
+	    //	    std::cout << "weight "<< W[i] <<  " = " << ip.weight << "\n";
+	    //	    std::cout << " transweight " << Trans->Weight() << " = " << detJ << "\n";
+            const double iJ11    =  J22*i_detJ; 
+            const double iJ12    = -J12*i_detJ; 
+            const double iJ21    = -J21*i_detJ; 
+            const double iJ22    =  J11*i_detJ;
+	    LM(2,i,e) = iJ11;
+	    LM(3,i,e) = iJ21;
+	    LM(4,i,e) = iJ12;
+	    LM(5,i,e) = iJ22;
+	 }
        }
      });
 
