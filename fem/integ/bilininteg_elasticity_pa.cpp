@@ -71,6 +71,7 @@ void  ElasticityIntegrator::AssembleDiagonalPA(Vector& diag)
 void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 {
   auto LM = Reshape(pa_data.Read(), 2+dim*dim, nq, ne);
+  auto Gt = maps->Gt.Read();
   auto X = Reshape(x_.Read(), dof, dim, ne);
   auto Y = Reshape(y_.ReadWrite(), dof, dim, ne);
 
@@ -78,15 +79,17 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
       {
 	const int e = q_global / nq;
 	const int i = q_global % nq;
-	DenseMatrix gshape(dof, dim);
+	double gshape[dof][dim];
 
 	const double LW = LM(1,i,e);
 	const double MW = LM(0,i,e);
 	
-	for (int ii = 0; ii < dim; ii++)
-	  for (int kk = 0; kk < dim; kk++) 
-	    for (int ll = 0; ll < dof; ll++) 
-	      gshape(ll,kk) += maps->Gt[ll+dof*(i+nq*ii)] * LM(2+ii+kk*dim,i,e);
+	for (int kk = 0; kk < dim; kk++) 
+	  for (int ll = 0; ll < dof; ll++) {
+	    gshape[ll][kk] = 0.;
+	    for (int ii = 0; ii < dim; ii++)
+	      gshape[ll][kk] += Gt[ll+dof*(i+nq*ii)] * LM(2+ii+kk*dim,i,e);
+	  }
 	
 	for (int ii = 0; ii < dim; ii++)
 	  for (int jj = 0; jj < dim; jj++) {
@@ -94,13 +97,13 @@ void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
 	    double contribA = 0;
 	    double contribC = 0;
 	    for (int ll = 0; ll < dof; ll++) {
-	      contribA += X(ll,ii,e) * gshape(ll, jj);
-	      contribB += X(ll,jj,e) * gshape(ll, jj);
-	      contribC += X(ll,jj,e) * gshape(ll, ii); 
+	      contribA += X(ll,ii,e) * gshape[ll][jj];
+	      contribB += X(ll,jj,e) * gshape[ll][jj];
+	      contribC += X(ll,jj,e) * gshape[ll][ii]; 
 	    }
 	    for (int kk = 0; kk < dof; kk++) {
-	      Y(kk,ii,e) += MW * gshape(kk, jj) * (contribA + contribC) +
-		LW * gshape(kk, ii) * contribB ;
+	      Y(kk,ii,e) += MW * gshape[kk][jj] * (contribA + contribC) +
+		LW * gshape[kk][ii] * contribB ;
 	    }
 	  }
       });
