@@ -73,14 +73,39 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
 	   const double detJ = J11 * (J22 * J33 - J32 * J23) -
 	     J21 * (J12 * J33 - J32 * J13) +
 	     J31 * (J12 * J23 - J22 * J13);
+            const double i_detJ = 1/detJ;
 	   LM(0,i,e) = W[i] * detJ * MU(i,e);
 	   LM(1,i,e) = W[i] * detJ * LAMBDA(i,e);
 	   //	   std::cout << "weight "<< W[i] <<  " = " << ip.weight << "\n";
 	   //	   std::cout << " transweight " << Trans->Weight() << " = " << detJ << "\n";
-	   for (int d1=0; d1<dim; d1++)
-	     for (int d2=0; d2<dim; d2++) {
-	       LM(2+d2+d1*dim,i,e) = invJ(d2,d1);
-	     }
+	   // adj(J)
+	   const double A11 = (J22 * J33) - (J23 * J32);
+	   const double A12 = (J32 * J13) - (J12 * J33);
+	   const double A13 = (J12 * J23) - (J22 * J13);
+	   const double A21 = (J31 * J23) - (J21 * J33);
+	   const double A22 = (J11 * J33) - (J13 * J31);
+	   const double A23 = (J21 * J13) - (J11 * J23);
+	   const double A31 = (J21 * J32) - (J31 * J22);
+	   const double A32 = (J31 * J12) - (J11 * J32);
+	   const double A33 = (J11 * J22) - (J12 * J21);
+	   LM( 2,i,e) = A11 * i_detJ; // 1,1
+	   LM( 3,i,e) = A21 * i_detJ; // 1,2
+	   LM( 4,i,e) = A31 * i_detJ; // 1,3
+	   LM( 5,i,e) = A12 * i_detJ; // 2,1
+	   LM( 6,i,e) = A22 * i_detJ; // 2,2
+	   LM( 7,i,e) = A32 * i_detJ; // 2,3
+	   LM( 8,i,e) = A13 * i_detJ; // 3,1
+	   LM( 9,i,e) = A23 * i_detJ; // 3,2
+	   LM(10,i,e) = A33 * i_detJ; // 3,3
+//	   for (int d1=0; d1<dim; d1++)
+//	     for (int d2=0; d2<dim; d2++) {
+//	       if (fabs(LM(2+d2+d1*dim,i,e)-invJ(d2,d1))>1e-10) {
+//		 std::cout << "invJ  "<< d1 << " " << d2 << " : " <<
+//		   LM(2+d2+d1*dim,i,e) << " - "<< invJ(d2,d1) << "\n";
+//		 exit(1);
+//	       } else std::cout << "OK\n";
+//	       LM(2+d2+d1*dim,i,e) = invJ(d2,d1);
+//	     }
 	 } else if (dim == 2) {
             const double J11 = J(i,0,0,e);
             const double J21 = J(i,1,0,e);
