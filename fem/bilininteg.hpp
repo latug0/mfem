@@ -3008,7 +3008,6 @@ private:
 
    // PA extension
    const DofToQuad *maps = NULL;         ///< Not owned
-   const GeometricFactors *geom = NULL;  ///< Not owned
    int dim, ne, nq, dof;
    Vector pa_data;
 

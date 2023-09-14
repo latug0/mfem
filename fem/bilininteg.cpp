@@ -3108,7 +3108,7 @@ void ElasticityIntegrator::AssembleElementMatrix(
    const int dim = el.GetDim();
    const int e = Trans.ElementNo;
    auto LM = Reshape(pa_data.Read(), 2+dim*dim, nq, ne);
-   
+   exit(0);
    MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
 
 #ifdef MFEM_THREAD_SAFE
@@ -3127,10 +3127,7 @@ void ElasticityIntegrator::AssembleElementMatrix(
    }
 
    Mesh *mesh = Trans.mesh;
-   if (geom == NULL) 
-     geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS);
-   if (maps == NULL) 
-     maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
+   auto  maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
 
    elmat = 0.0;
    nq =ir->GetNPoints();

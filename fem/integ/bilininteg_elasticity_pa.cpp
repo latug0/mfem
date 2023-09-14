@@ -18,11 +18,13 @@
 namespace mfem
 {
 
+  constexpr int MAXNDOF = 15;
   static void PAElasticitySetup_bis(const int dim,
 				    const int nq,
 				    const int ne,
 				    const int ndof,
 				    const Vector &pJ,
+				    const Array<double> &pGt,
 				    const Array<double> &pW,
 				    const Vector &pMU,
 				    const Vector &pLAMBDA,
@@ -99,18 +101,20 @@ namespace mfem
 				const int ne,
 				const int ndof,
 				const Vector &pJ,
+				const Array<double> &pGt,
 				const Array<double> &pW,
 				const Vector &pMU,
 				const Vector &pLAMBDA,
 				Vector &op) {
+
     if (dim == 1) { MFEM_ABORT("dim==1 not supported in PAElasticitySetup"); }
     if (dim == 2)
       {
-	PAElasticitySetup_bis(dim, nq, ne, ndof, pJ, pW, pMU, pLAMBDA, op);
+	PAElasticitySetup_bis(dim, nq, ne, ndof, pJ, pGt, pW, pMU, pLAMBDA, op);
       }
     if (dim == 3)
       {
-	PAElasticitySetup_bis(dim, nq, ne, ndof, pJ, pW, pMU, pLAMBDA, op);
+	PAElasticitySetup_bis(dim, nq, ne, ndof, pJ, pGt, pW, pMU, pLAMBDA, op);
       }
   }
 
@@ -123,10 +127,8 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    ElementTransformation &TransRef = *fes.GetElementTransformation(0);
    const IntegrationRule *ir = IntRule ? IntRule :  
      &IntRules.Get(el.GetGeomType(), 2 * TransRef.OrderGrad(&el));
-   if (geom == NULL) 
-     geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS, mt);
-   if (maps == NULL) 
-     maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
+   maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
+   auto  geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS, mt);
 
    QuadratureSpace qs(*mesh, *ir);
    CoefficientVector coeffmu(qs, CoefficientStorage::COMPRESSED);
@@ -136,12 +138,13 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    dim = el.GetDim();
    dof = el.GetDof();
    nq = ir->GetNPoints();
-   MFEM_VERIFY(dim == 2 || dim == 3, "");
-
    ne = fes.GetNE();
-
+   MFEM_VERIFY(dim == 2 || dim == 3, "");
    pa_data.SetSize((2+dim*dim) * nq * ne, mt);
-   PAElasticitySetup(dim, nq, ne, dof, geom->J, ir->GetWeights(),
+   if (nq > MAXNDOF)
+     MFEM_ABORT("MAXNDOF too low");
+   
+   PAElasticitySetup(dim, nq, ne, dof, geom->J, maps->Gt, ir->GetWeights(),
 		     coeffmu, coefflambda, pa_data);
 }
 
@@ -151,45 +154,115 @@ void  ElasticityIntegrator::AssembleDiagonalPA(Vector& diag)
 }
 
 
-void ElasticityIntegrator::AddMultPA(const Vector &x_, Vector &y_) const
+void PAElasticityApply2D(const int dim,
+			 const int nq,
+			 const int ne,
+			 const int ndof,
+			 const Array<double> &pGt,
+			 const Vector &op,
+			 const Vector &px,
+			 Vector &py)
 {
-  auto LM = Reshape(pa_data.Read(), 2+dim*dim, nq, ne);
-  auto Gt = maps->Gt.Read();
-  auto X = Reshape(x_.Read(), dof, dim, ne);
-  auto Y = Reshape(y_.ReadWrite(), dof, dim, ne);
-
+  constexpr int MDIM = 2;
+  auto LM = Reshape(op.Read(), 2+dim*dim, nq, ne);
+  auto Gt = Reshape(pGt.Read(),nq*ndof*dim);
+  auto X = Reshape(px.Read(), ndof, dim, ne);
+  auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
+  
+  std::cout << "called ne=" << ne << " nq=" << nq << "\n" ;
   mfem::forall(ne*nq, [=] MFEM_HOST_DEVICE (int q_global)
       {
-	const int e = q_global / nq;
-	const int i = q_global % nq;
-	double gshape[dof][dim];
+	int e = q_global / nq;
+	int i = q_global % nq;
+	double gshape[MAXNDOF][MDIM];
 
-	const double LW = LM(1,i,e);
-	const double MW = LM(0,i,e);
+	double LW = LM(1,i,e);
+	double MW = LM(0,i,e);
 	
-	for (int kk = 0; kk < dim; kk++) 
-	  for (int ll = 0; ll < dof; ll++) {
+	for (int kk = 0; kk < MDIM; kk++) 
+	  for (int ll = 0; ll < ndof; ll++) {
 	    gshape[ll][kk] = 0.;
-	    for (int ii = 0; ii < dim; ii++)
-	      gshape[ll][kk] += Gt[ll+dof*(i+nq*ii)] * LM(2+ii+kk*dim,i,e);
+	    for (int ii = 0; ii < MDIM; ii++)
+	      gshape[ll][kk] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+kk*MDIM,i,e);
 	  }
 	
-	for (int ii = 0; ii < dim; ii++)
-	  for (int jj = 0; jj < dim; jj++) {
+	for (int ii = 0; ii < MDIM; ii++)
+	  for (int jj = 0; jj < MDIM; jj++) {
 	    double contribB = 0.;
 	    double contribA = 0;
 	    double contribC = 0;
-	    for (int ll = 0; ll < dof; ll++) {
+	    for (int ll = 0; ll < ndof; ll++) {
 	      contribA += X(ll,ii,e) * gshape[ll][jj];
 	      contribB += X(ll,jj,e) * gshape[ll][jj];
 	      contribC += X(ll,jj,e) * gshape[ll][ii]; 
 	    }
-	    for (int kk = 0; kk < dof; kk++) {
+	    for (int kk = 0; kk < ndof; kk++) {
 	      Y(kk,ii,e) += MW * gshape[kk][jj] * (contribA + contribC) +
 		LW * gshape[kk][ii] * contribB ;
 	    }
 	  }
       });
+}
+
+void PAElasticityApply3D(const int dim,
+			 const int nq,
+			 const int ne,
+			 const int ndof,
+			 const Array<double> &pGt,
+			 const Vector &op,
+			 const Vector &px,
+			 Vector &py)
+{
+  constexpr int MDIM = 3;
+  auto LM = Reshape(op.Read(), 2+dim*dim, nq, ne);
+  auto Gt = Reshape(pGt.Read(),nq*ndof*dim);
+  auto X = Reshape(px.Read(), ndof, dim, ne);
+  auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
+  mfem::forall(ne*nq, [=] MFEM_HOST_DEVICE (int q_global)
+      {
+	int e = q_global / nq;
+	int i = q_global % nq;
+	double gshape[MAXNDOF][MDIM];
+
+	double LW = LM(1,i,e);
+	double MW = LM(0,i,e);
+	
+	for (int kk = 0; kk < MDIM; kk++) 
+	  for (int ll = 0; ll < ndof; ll++) {
+	    gshape[ll][kk] = 0.;
+	    for (int ii = 0; ii < MDIM; ii++)
+	      gshape[ll][kk] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+kk*MDIM,i,e);
+	  }
+	
+	for (int ii = 0; ii < MDIM; ii++)
+	  for (int jj = 0; jj < MDIM; jj++) {
+	    double contribB = 0.;
+	    double contribA = 0;
+	    double contribC = 0;
+	    for (int ll = 0; ll < ndof; ll++) {
+	      contribA += X(ll,ii,e) * gshape[ll][jj];
+	      contribB += X(ll,jj,e) * gshape[ll][jj];
+	      contribC += X(ll,jj,e) * gshape[ll][ii]; 
+	    }
+	    for (int kk = 0; kk < ndof; kk++) {
+	      Y(kk,ii,e) += MW * gshape[kk][jj] * (contribA + contribC) +
+		LW * gshape[kk][ii] * contribB ;
+	    }
+	  }
+      });
+}
+
+void ElasticityIntegrator::AddMultPA(const Vector &x, Vector &y) const
+{
+    if (dim == 1) { MFEM_ABORT("dim==1 not supported in PAElasticitySetup"); }
+    if (dim == 2)
+      {
+	PAElasticityApply2D(dim, nq, ne, dof, maps->Gt, pa_data, x, y);
+      }
+    if (dim == 3)
+      {
+	PAElasticityApply3D(dim, nq, ne, dof, maps->Gt, pa_data, x, y);
+      }
 }
 
 } // namespace mfem

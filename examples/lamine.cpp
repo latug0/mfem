@@ -90,7 +90,7 @@ public:
   void AssembleRHSElementVect(
     const FiniteElement &el, ElementTransformation &Tr, Vector &elvect)
   {
-    int dof = el.GetDof();
+    int dof = el.GetDof(); 
     int spaceDim = Tr.GetSpaceDim();
     
     dshape.SetSize(dof, spaceDim);
@@ -98,7 +98,7 @@ public:
     Svec.SetSize(3);
     elvect.SetSize(dof*spaceDim);
     elvect = 0.0;
-    
+    std::cout << "called\n";
     const IntegrationRule *ir = IntRule;
     if (ir == NULL)
       {
@@ -170,6 +170,7 @@ int main(int argc, char *argv[])
    int order = 1;
    int tcase = 1;
    bool static_cond = false;
+   const char *device_config = "cpu";
    bool visualization = 1;
 
    OptionsParser args(argc, argv);
@@ -181,6 +182,8 @@ int main(int argc, char *argv[])
                   "Finite element order (polynomial degree).");
    args.AddOption(&tcase, "-t", "--tcase",
                   "identifier of the case : Exx->1, Eyy->2, Ezz->3, Exy->4, Eyz->5, Exz->6");
+   args.AddOption(&device_config, "-d", "--device",
+                  "Device configuration string, see Device::Configure().");
    args.Parse();
    if (!args.Good())
    {
@@ -188,6 +191,9 @@ int main(int argc, char *argv[])
       return 1;
    }
    args.PrintOptions(cout);
+
+   Device device(device_config);
+   device.Print();
 
    //   Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral or hexahedral elements with the same code.
