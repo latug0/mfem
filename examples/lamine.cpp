@@ -448,17 +448,21 @@ int main(int argc, char *argv[])
    VectorFunctionCoefficient sol_coef (dim, sol_exact);
    double errorL2 = x.ComputeL2Error(sol_coef);
    cerr<<"\ntcase " << tcase << " -- L2 norm: " << errorL2 << endl;
+   delete a;
+   delete fespace;
+   delete fec;
+   delete fieldspace;
+   delete mesh;
    if (errorL2 < 1e-10)
      {
        cerr << "OK" << endl;
-       exit(0);
+       return 0;
      }
    else
      {
        cerr << "Fail" << endl;
-       exit(1);
+       return 1;
      }
-	
 }
 
 

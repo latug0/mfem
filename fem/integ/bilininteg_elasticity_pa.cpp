@@ -170,15 +170,16 @@ void PAElasticityApply2D(const int dim,
   auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
   
   std::cout << "called ne=" << ne << " nq=" << nq << "\n" ;
-  mfem::forall(ne*nq, [=] MFEM_HOST_DEVICE (int q_global)
+  mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
       {
-	int e = q_global / nq;
-	int i = q_global % nq;
-	double gshape[MAXNDOF][MDIM];
+//	int e = q_global / nq;
+//	int i = q_global % nq;
+	for (int i=0; i<nq; i++) {
+	  double gshape[MAXNDOF][MDIM];
 
-	double LW = LM(1,i,e);
-	double MW = LM(0,i,e);
-	
+	  double LW = LM(1,i,e);
+	  double MW = LM(0,i,e);
+	  
 	for (int kk = 0; kk < MDIM; kk++) 
 	  for (int ll = 0; ll < ndof; ll++) {
 	    gshape[ll][kk] = 0.;
@@ -197,10 +198,12 @@ void PAElasticityApply2D(const int dim,
 	      contribC += X(ll,jj,e) * gshape[ll][ii]; 
 	    }
 	    for (int kk = 0; kk < ndof; kk++) {
+	      // conflict in writing if parallelized on dofs
 	      Y(kk,ii,e) += MW * gshape[kk][jj] * (contribA + contribC) +
 		LW * gshape[kk][ii] * contribB ;
 	    }
 	  }
+	}
       });
 }
 
@@ -218,20 +221,18 @@ void PAElasticityApply3D(const int dim,
   auto Gt = Reshape(pGt.Read(),nq*ndof*dim);
   auto X = Reshape(px.Read(), ndof, dim, ne);
   auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
-  mfem::forall(ne*nq, [=] MFEM_HOST_DEVICE (int q_global)
+  mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
       {
-	int e = q_global / nq;
-	int i = q_global % nq;
+	for (int i=0; i<nq; i++) {
 	double gshape[MAXNDOF][MDIM];
-
 	double LW = LM(1,i,e);
 	double MW = LM(0,i,e);
 	
 	for (int kk = 0; kk < MDIM; kk++) 
 	  for (int ll = 0; ll < ndof; ll++) {
 	    gshape[ll][kk] = 0.;
-	    for (int ii = 0; ii < MDIM; ii++)
-	      gshape[ll][kk] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+kk*MDIM,i,e);
+	    for (int mm = 0; mm < MDIM; mm++)
+	      gshape[ll][kk] += Gt[ll+ndof*(i+nq*mm)] * LM(2+mm+kk*MDIM,i,e);
 	  }
 	
 	for (int ii = 0; ii < MDIM; ii++)
@@ -249,6 +250,7 @@ void PAElasticityApply3D(const int dim,
 		LW * gshape[kk][ii] * contribB ;
 	    }
 	  }
+      }
       });
 }
 
