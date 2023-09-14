@@ -18,6 +18,102 @@
 namespace mfem
 {
 
+  static void PAElasticitySetup_bis(const int dim,
+				    const int nq,
+				    const int ne,
+				    const int ndof,
+				    const Vector &pJ,
+				    const Array<double> &pW,
+				    const Vector &pMU,
+				    const Vector &pLAMBDA,
+				    Vector &op) {
+
+    auto J = Reshape(pJ.Read(), nq, dim, dim, ne);
+    auto W = pW.Read();
+    auto MU = Reshape(pMU.Read(),nq,ne);
+    auto LAMBDA = Reshape(pLAMBDA.Read(),nq,ne);
+    auto LM = Reshape(op.Write(), 2+dim*dim, nq, ne);
+    mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
+    {
+      for (int i = 0; i < nq; i++) {
+	if (dim == 3) {
+	  const double J11 = J(i,0,0,e);
+	  const double J21 = J(i,1,0,e);
+	  const double J31 = J(i,2,0,e);
+	  const double J12 = J(i,0,1,e);
+	  const double J22 = J(i,1,1,e);
+	  const double J32 = J(i,2,1,e);
+	  const double J13 = J(i,0,2,e);
+	  const double J23 = J(i,1,2,e);
+	  const double J33 = J(i,2,2,e);
+	  const double detJ =
+	    J11 * (J22 * J33 - J32 * J23) -
+	     J21 * (J12 * J33 - J32 * J13) +
+	    J31 * (J12 * J23 - J22 * J13);
+	  const double i_detJ = 1/detJ;
+	  LM(0,i,e) = W[i] * i_detJ * MU(i,e);
+	  LM(1,i,e) = W[i] * i_detJ * LAMBDA(i,e);
+	  // adj(J)
+	  const double A11 = (J22 * J33) - (J23 * J32);
+	  const double A12 = (J32 * J13) - (J12 * J33);
+	  const double A13 = (J12 * J23) - (J22 * J13);
+	  const double A21 = (J31 * J23) - (J21 * J33);
+	  const double A22 = (J11 * J33) - (J13 * J31);
+	  const double A23 = (J21 * J13) - (J11 * J23);
+	  const double A31 = (J21 * J32) - (J31 * J22);
+	  const double A32 = (J31 * J12) - (J11 * J32);
+	  const double A33 = (J11 * J22) - (J12 * J21);
+	  LM( 2,i,e) = A11; // 1,1
+	  LM( 3,i,e) = A21; // 1,2
+	  LM( 4,i,e) = A31; // 1,3
+	  LM( 5,i,e) = A12; // 2,1
+	  LM( 6,i,e) = A22; // 2,2
+	  LM( 7,i,e) = A32; // 2,3
+	  LM( 8,i,e) = A13; // 3,1
+	  LM( 9,i,e) = A23; // 3,2
+	  LM(10,i,e) = A33; // 3,3
+	} else if (dim == 2) {
+	  const double J11 = J(i,0,0,e);
+	  const double J21 = J(i,1,0,e);
+	  const double J12 = J(i,0,1,e);
+	  const double J22 = J(i,1,1,e);
+	  const double detJ = ((J11*J22)-(J21*J12));
+	  const double i_detJ = 1/detJ;
+	  LM(0,i,e) = W[i] * i_detJ * MU(i,e);
+	  LM(1,i,e) = W[i] * i_detJ * LAMBDA(i,e);
+	  const double iJ11    =  J22; 
+	  const double iJ12    = -J12; 
+	  const double iJ21    = -J21; 
+	  const double iJ22    =  J11;
+	  LM(2,i,e) = iJ11;
+	  LM(3,i,e) = iJ21;
+	  LM(4,i,e) = iJ12;
+	  LM(5,i,e) = iJ22;
+	}
+      }
+    });
+  }
+
+  static void PAElasticitySetup(const int dim,
+				const int nq,
+				const int ne,
+				const int ndof,
+				const Vector &pJ,
+				const Array<double> &pW,
+				const Vector &pMU,
+				const Vector &pLAMBDA,
+				Vector &op) {
+    if (dim == 1) { MFEM_ABORT("dim==1 not supported in PAElasticitySetup"); }
+    if (dim == 2)
+      {
+	PAElasticitySetup_bis(dim, nq, ne, ndof, pJ, pW, pMU, pLAMBDA, op);
+      }
+    if (dim == 3)
+      {
+	PAElasticitySetup_bis(dim, nq, ne, ndof, pJ, pW, pMU, pLAMBDA, op);
+      }
+  }
+
 void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
 {
    const MemoryType mt = (pa_mt == MemoryType::DEFAULT) ?
@@ -28,7 +124,7 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    const IntegrationRule *ir = IntRule ? IntRule :  
      &IntRules.Get(el.GetGeomType(), 2 * TransRef.OrderGrad(&el));
    if (geom == NULL) 
-     geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS);
+     geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS, mt);
    if (maps == NULL) 
      maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
 
@@ -43,76 +139,10 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    MFEM_VERIFY(dim == 2 || dim == 3, "");
 
    ne = fes.GetNE();
-   geom = mesh->GetGeometricFactors(*ir, GeometricFactors::JACOBIANS, mt);
 
    pa_data.SetSize((2+dim*dim) * nq * ne, mt);
-
-
-   auto J = Reshape(geom->J.Read(), nq, dim, dim, ne);
-   auto MU = Reshape(coeffmu.Read(),nq,ne);
-   auto LAMBDA = Reshape(coefflambda.Read(),nq,ne);
-   auto LM = Reshape(pa_data.Write(), 2+dim*dim, nq, ne);
-   auto W = ir->GetWeights().Read();
-   mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
-     {
-       for (int i = 0; i < ir -> GetNPoints(); i++) {
-	 if (dim == 3) {
-	   const double J11 = J(i,0,0,e);
-	   const double J21 = J(i,1,0,e);
-	   const double J31 = J(i,2,0,e);
-	   const double J12 = J(i,0,1,e);
-	   const double J22 = J(i,1,1,e);
-	   const double J32 = J(i,2,1,e);
-	   const double J13 = J(i,0,2,e);
-	   const double J23 = J(i,1,2,e);
-	   const double J33 = J(i,2,2,e);
-	   const double detJ =
-	     J11 * (J22 * J33 - J32 * J23) -
-	     J21 * (J12 * J33 - J32 * J13) +
-	     J31 * (J12 * J23 - J22 * J13);
-            const double i_detJ = 1/detJ;
-	   LM(0,i,e) = W[i] * i_detJ * MU(i,e);
-	   LM(1,i,e) = W[i] * i_detJ * LAMBDA(i,e);
-	   // adj(J)
-	   const double A11 = (J22 * J33) - (J23 * J32);
-	   const double A12 = (J32 * J13) - (J12 * J33);
-	   const double A13 = (J12 * J23) - (J22 * J13);
-	   const double A21 = (J31 * J23) - (J21 * J33);
-	   const double A22 = (J11 * J33) - (J13 * J31);
-	   const double A23 = (J21 * J13) - (J11 * J23);
-	   const double A31 = (J21 * J32) - (J31 * J22);
-	   const double A32 = (J31 * J12) - (J11 * J32);
-	   const double A33 = (J11 * J22) - (J12 * J21);
-	   LM( 2,i,e) = A11; // 1,1
-	   LM( 3,i,e) = A21; // 1,2
-	   LM( 4,i,e) = A31; // 1,3
-	   LM( 5,i,e) = A12; // 2,1
-	   LM( 6,i,e) = A22; // 2,2
-	   LM( 7,i,e) = A32; // 2,3
-	   LM( 8,i,e) = A13; // 3,1
-	   LM( 9,i,e) = A23; // 3,2
-	   LM(10,i,e) = A33; // 3,3
-	 } else if (dim == 2) {
-            const double J11 = J(i,0,0,e);
-            const double J21 = J(i,1,0,e);
-            const double J12 = J(i,0,1,e);
-            const double J22 = J(i,1,1,e);
-            const double detJ = ((J11*J22)-(J21*J12));
-            const double i_detJ = 1/detJ;
-	    LM(0,i,e) = W[i] * i_detJ * MU(i,e);
-	    LM(1,i,e) = W[i] * i_detJ * LAMBDA(i,e);
-            const double iJ11    =  J22; 
-            const double iJ12    = -J12; 
-            const double iJ21    = -J21; 
-            const double iJ22    =  J11;
-	    LM(2,i,e) = iJ11;
-	    LM(3,i,e) = iJ21;
-	    LM(4,i,e) = iJ12;
-	    LM(5,i,e) = iJ22;
-	 }
-       }
-     });
-
+   PAElasticitySetup(dim, nq, ne, dof, geom->J, ir->GetWeights(),
+		     coeffmu, coefflambda, pa_data);
 }
 
 void  ElasticityIntegrator::AssembleDiagonalPA(Vector& diag)
