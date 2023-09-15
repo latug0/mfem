@@ -345,7 +345,7 @@ int main(int argc, char *argv[])
    // solve the system Ax=b with PCG.
 //   GSSmoother M(A);
 //   PCG(A, M, B, X, 1, 500, 1e-24, 0.0);
-   CG(*A, B, X, 1, 800, 1e-24, 0.0);
+   CG(*A, B, X, 1, 1200, 1e-24, 0.0);
    //CG(A, B, X, 1, 500, 1e-24, 0.0);
 
    //  Recover the solution as a finite element grid function.
