@@ -3008,7 +3008,7 @@ private:
 
    // PA extension
    const DofToQuad *maps;         ///< Not owned
-   int dim, ne, nq, dof;
+   int dim, ne, nq, ndof;
    Vector pa_data;
 
 public:

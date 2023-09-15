@@ -18,7 +18,8 @@
 namespace mfem
 {
 
-  constexpr int MAXNDOF = 15;
+  constexpr int MAXNDOF = 29;
+  constexpr int MAXNQ = 29;
   static void PAElasticitySetup_bis(const int dim,
 				    const int nq,
 				    const int ne,
@@ -136,15 +137,17 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    coeffmu.Project(*mu);
    coefflambda.Project(*lambda);
    dim = el.GetDim();
-   dof = el.GetDof();
+   ndof = el.GetDof();
    nq = ir->GetNPoints();
    ne = fes.GetNE();
    MFEM_VERIFY(dim == 2 || dim == 3, "");
    pa_data.SetSize((2+dim*dim) * nq * ne, mt);
-   if (nq > MAXNDOF)
+   if (ndof > MAXNDOF)
      MFEM_ABORT("MAXNDOF too low");
+   if (nq > MAXNQ)
+     MFEM_ABORT("MAXNQ too low");
    
-   PAElasticitySetup(dim, nq, ne, dof, geom->J, maps->Gt, ir->GetWeights(),
+   PAElasticitySetup(dim, nq, ne, ndof, geom->J, maps->Gt, ir->GetWeights(),
 		     coeffmu, coefflambda, pa_data);
 }
 
@@ -169,7 +172,6 @@ void PAElasticityApply2D(const int dim,
   auto X = Reshape(px.Read(), ndof, dim, ne);
   auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
   
-  std::cout << "called ne=" << ne << " nq=" << nq << "\n" ;
   mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
       {
 //	int e = q_global / nq;
@@ -204,6 +206,78 @@ void PAElasticityApply2D(const int dim,
 	    }
 	  }
 	}
+      });
+}
+
+void PAElasticityApply2D_optim(const int dim,
+			       const int nq,
+			       const int ne,
+			       const int ndof,
+			       const Array<double> &pGt,
+			       const Vector &op,
+			       const Vector &px,
+			       Vector &py)
+{
+  constexpr int MDIM = 2;
+  auto LM = Reshape(op.Read(), 2+dim*dim, nq, ne);
+  auto Gt = Reshape(pGt.Read(),nq*ndof*dim);
+  auto X = Reshape(px.Read(), ndof, dim, ne);
+  auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
+  std::cout << "optim ne=" << ne << " nq=" << nq << " ndof " << ndof << "\n" ;
+  
+  mfem::forall_2D(ne, nq, ndof, [=] MFEM_HOST_DEVICE (int e)
+      {
+//	int e = q_global / nq;
+//	int i = q_global % nq;
+	const int tidx = MFEM_THREAD_ID(x);
+	const int tidy = MFEM_THREAD_ID(y);
+	MFEM_SHARED double gshape[MAXNQ*MAXNDOF][MDIM];
+	MFEM_FOREACH_THREAD(i,x,nq) {  
+	  for (int kk = 0; kk < MDIM; kk++) {
+	    MFEM_FOREACH_THREAD(ll,y,ndof) {
+	      gshape[ll+ndof*i][kk] = 0.;
+	      for (int ii = 0; ii < MDIM; ii++)
+		gshape[ll+ndof*i][kk] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+kk*MDIM,i,e);
+	    }
+	  }
+	}
+	MFEM_SYNC_THREAD;
+ 
+	MFEM_SHARED double contribA[MAXNQ][MDIM*MDIM];
+	MFEM_SHARED double contribB[MAXNQ][MDIM*MDIM];
+	MFEM_SHARED double contribC[MAXNQ][MDIM*MDIM];
+	if (tidy == 0) {
+	  for (int ii = 0; ii < MDIM; ii++)
+	    for (int jj = 0; jj < MDIM; jj++) {
+	      MFEM_FOREACH_THREAD(i,x,nq) {
+		contribB[i][jj+MDIM*ii] = 0.;
+		contribA[i][jj+MDIM*ii] = 0;
+		contribC[i][jj+MDIM*ii] = 0;
+		for (int ll = 0; ll < ndof; ll++) {
+		  contribA[i][jj+MDIM*ii] += X(ll,ii,e) * gshape[ll+ndof*i][jj];
+		  contribB[i][jj+MDIM*ii] += X(ll,jj,e) * gshape[ll+ndof*i][jj];
+		  contribC[i][jj+MDIM*ii] += X(ll,jj,e) * gshape[ll+ndof*i][ii]; 
+		}
+	      }
+	    }
+	}
+	MFEM_SYNC_THREAD;
+	
+	if (tidx == 0) {
+	  MFEM_FOREACH_THREAD(kk,y,ndof) {
+	    for (int ii = 0; ii < MDIM; ii++)
+	      for (int jj = 0; jj < MDIM; jj++) {
+		for (int i = 0; i < nq; i++) {	    
+		  const double LW = LM(1,i,e);
+		  const double MW = LM(0,i,e);
+		  Y(kk,ii,e) +=
+		    MW * gshape[kk+ndof*i][jj] * (contribA[i][jj+MDIM*ii]+ contribC[i][jj+MDIM*ii]) +
+		    LW * gshape[kk+ndof*i][ii] * contribB[i][jj+MDIM*ii] ;
+		}
+	      }
+	  }
+	}
+	MFEM_SYNC_THREAD;
       });
 }
 
@@ -259,11 +333,11 @@ void ElasticityIntegrator::AddMultPA(const Vector &x, Vector &y) const
     if (dim == 1) { MFEM_ABORT("dim==1 not supported in PAElasticitySetup"); }
     if (dim == 2)
       {
-	PAElasticityApply2D(dim, nq, ne, dof, maps->Gt, pa_data, x, y);
+	PAElasticityApply2D_optim(dim, nq, ne, ndof, maps->Gt, pa_data, x, y);
       }
     if (dim == 3)
       {
-	PAElasticityApply3D(dim, nq, ne, dof, maps->Gt, pa_data, x, y);
+	PAElasticityApply3D(dim, nq, ne, ndof, maps->Gt, pa_data, x, y);
       }
 }
 

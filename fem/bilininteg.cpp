@@ -3108,7 +3108,6 @@ void ElasticityIntegrator::AssembleElementMatrix(
    const int dim = el.GetDim();
    const int e = Trans.ElementNo;
    auto LM = Reshape(pa_data.Read(), 2+dim*dim, nq, ne);
-   exit(0);
    MFEM_ASSERT(dim == Trans.GetSpaceDim(), "");
 
 #ifdef MFEM_THREAD_SAFE
