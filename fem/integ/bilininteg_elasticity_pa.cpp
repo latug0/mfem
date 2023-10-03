@@ -159,6 +159,72 @@ void  ElasticityIntegrator::AssembleDiagonalPA(Vector& diag)
 }
 
 
+void PAElasticityApply2D_try(const int dim,
+			 const int nq,
+			 const int ne,
+			 const int ndof,
+			 const Array<double> &pGt,
+			 const Vector &op,
+			 const Vector &px,
+			 Vector &py)
+{
+  constexpr int MDIM = 2;
+  auto LM = Reshape(op.Read(), 2+dim*dim, nq, ne);
+  auto Gt = Reshape(pGt.Read(),nq*ndof*dim);
+  auto X = Reshape(px.Read(), ndof, dim, ne);
+  auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
+  int maxndofnq = (ndof>nq?ndof:nq);
+  
+  mfem::forall_2D(ne, maxndofnq, MDIM, [=] MFEM_HOST_DEVICE (int e)
+      {
+	for (int i=0; i<nq; i++) {
+	  MFEM_SHARED double gshape[MAXNDOF][MDIM];
+
+	  const double LW = LM(1,i,e);
+	  const double MW = LM(0,i,e);
+	  
+	  MFEM_FOREACH_THREAD(ll,x,ndof) {  
+	    MFEM_FOREACH_THREAD(kk,y,MDIM) {  
+	      gshape[ll][kk] = 0.;
+	      for (int ii = 0; ii < MDIM; ii++)
+		gshape[ll][kk] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+kk*MDIM,i,e);
+	    }
+	  }
+	  MFEM_SYNC_THREAD;
+	
+	  MFEM_SHARED double contribA[MDIM][MDIM];
+	  MFEM_SHARED double contribB[MDIM][MDIM];
+	  MFEM_SHARED double contribC[MDIM][MDIM];
+	  const int tidx = MFEM_THREAD_ID(x);
+	  if (tidx == 0) {
+	    MFEM_FOREACH_THREAD(ii,y,MDIM) {  
+	      for (int jj = 0; jj < MDIM; jj++) {
+		contribB[ii][jj] = 0.;
+		contribA[ii][jj] = 0;
+		contribC[ii][jj] = 0;
+		for (int ll = 0; ll < ndof; ll++) {
+		  contribA[ii][jj] += X(ll,ii,e) * gshape[ll][jj];
+		  contribB[ii][jj] += X(ll,jj,e) * gshape[ll][jj];
+		  contribC[ii][jj] += X(ll,jj,e) * gshape[ll][ii]; 
+		}
+	      }
+	    }
+	  }
+	  MFEM_SYNC_THREAD;
+	  MFEM_FOREACH_THREAD(kk,x,ndof) {  
+	    MFEM_FOREACH_THREAD(ii,y,MDIM) {  
+	      for (int jj = 0; jj < MDIM; jj++) {
+		// conflict in writing if parallelized on dofs
+		Y(kk,ii,e) += MW * gshape[kk][jj] * (contribA[ii][jj] + contribC[ii][jj]) +
+		  LW * gshape[kk][ii] * contribB[ii][jj] ;
+	      }
+	    }
+	  }
+	  MFEM_SYNC_THREAD;
+	}
+      });
+}
+
 void PAElasticityApply2D(const int dim,
 			 const int nq,
 			 const int ne,
@@ -174,37 +240,36 @@ void PAElasticityApply2D(const int dim,
   auto X = Reshape(px.Read(), ndof, dim, ne);
   auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
   
-  mfem::forall(ne, [=] MFEM_HOST_DEVICE (int e)
+  mfem::forall(ne*MDIM, [=] MFEM_HOST_DEVICE (int q_global)
       {
-//	int e = q_global / nq;
-//	int i = q_global % nq;
+	int e = q_global / MDIM;
+	int pp = q_global % MDIM;
+	double gshape[MAXNDOF][MDIM];
 	for (int i=0; i<nq; i++) {
-	  double gshape[MAXNDOF][MDIM];
 
 	  double LW = LM(1,i,e);
 	  double MW = LM(0,i,e);
 	  
-	for (int kk = 0; kk < MDIM; kk++) 
-	  for (int ll = 0; ll < ndof; ll++) {
-	    gshape[ll][kk] = 0.;
-	    for (int ii = 0; ii < MDIM; ii++)
-	      gshape[ll][kk] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+kk*MDIM,i,e);
-	  }
-	
-	for (int ii = 0; ii < MDIM; ii++)
+	  for (int jj = 0; jj < MDIM; jj++)
+	    for (int ll = 0; ll < ndof; ll++) {
+	      gshape[ll][jj] = 0.;
+	      for (int ii = 0; ii < MDIM; ii++)
+		gshape[ll][jj] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+jj*MDIM,i,e);
+	    }
+	  
 	  for (int jj = 0; jj < MDIM; jj++) {
 	    double contribB = 0.;
 	    double contribA = 0;
 	    double contribC = 0;
 	    for (int ll = 0; ll < ndof; ll++) {
-	      contribA += X(ll,ii,e) * gshape[ll][jj];
+	      contribA += X(ll,pp,e) * gshape[ll][jj];
 	      contribB += X(ll,jj,e) * gshape[ll][jj];
-	      contribC += X(ll,jj,e) * gshape[ll][ii]; 
+	      contribC += X(ll,jj,e) * gshape[ll][pp]; 
 	    }
 	    for (int kk = 0; kk < ndof; kk++) {
 	      // conflict in writing if parallelized on dofs
-	      Y(kk,ii,e) += MW * gshape[kk][jj] * (contribA + contribC) +
-		LW * gshape[kk][ii] * contribB ;
+	      Y(kk,pp,e) += MW * gshape[kk][jj] * (contribA + contribC) +
+		LW * gshape[kk][pp] * contribB ;
 	    }
 	  }
 	}
@@ -230,13 +295,13 @@ void PAElasticityApply2D_optim(const int dim,
       {
 	const int tidx = MFEM_THREAD_ID(x);
 	const int tidy = MFEM_THREAD_ID(y);
-	MFEM_SHARED double gshape[MAXNQ*MAXNDOF][MDIM];
+	MFEM_SHARED double gshape[MDIM][MAXNQ*MAXNDOF];
 	MFEM_FOREACH_THREAD(ll,x,ndof) {  
 	  MFEM_FOREACH_THREAD(jj,y,MDIM) {
-	    for (int i=0; i<nq; i++) {
-	      gshape[ll+ndof*i][jj] = 0.;
+	    for (int i = 0; i < nq; i++) {
+	      gshape[jj][ll+ndof*i] = 0.;
 	      for (int ii = 0; ii < MDIM; ii++)
-		gshape[ll+ndof*i][jj] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+jj*MDIM,i,e);
+		gshape[jj][ll+ndof*i] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+jj*MDIM,i,e);
 	    }
 	  }
 	}
@@ -253,9 +318,9 @@ void PAElasticityApply2D_optim(const int dim,
 	      contribA[i][jj+MDIM*ii] = 0;
 	      contribC[i][jj+MDIM*ii] = 0;
 	      for (int ll = 0; ll < ndof; ll++) {
-		contribA[i][jj+MDIM*ii] += X(ll,ii,e) * gshape[ll+ndof*i][jj];
-		contribB[i][jj+MDIM*ii] += X(ll,jj,e) * gshape[ll+ndof*i][jj];
-		contribC[i][jj+MDIM*ii] += X(ll,jj,e) * gshape[ll+ndof*i][ii]; 
+		contribA[i][jj+MDIM*ii] += X(ll,ii,e) * gshape[jj][ll+ndof*i];
+		contribB[i][jj+MDIM*ii] += X(ll,jj,e) * gshape[jj][ll+ndof*i];
+		contribC[i][jj+MDIM*ii] += X(ll,jj,e) * gshape[ii][ll+ndof*i]; 
 	      }
 	    }
 	  }
@@ -269,8 +334,8 @@ void PAElasticityApply2D_optim(const int dim,
 		const double LW = LM(1,i,e);
 		const double MW = LM(0,i,e);
 		Y(kk,ii,e) +=
-		  MW * gshape[kk+ndof*i][jj] * (contribA[i][jj+MDIM*ii]+ contribC[i][jj+MDIM*ii]) +
-		  LW * gshape[kk+ndof*i][ii] * contribB[i][jj+MDIM*ii] ;
+		  MW * gshape[jj][kk+ndof*i] * (contribA[i][jj+MDIM*ii]+ contribC[i][jj+MDIM*ii]) +
+		  LW * gshape[ii][kk+ndof*i] * contribB[i][jj+MDIM*ii] ;
 	      }
 	    }
 	  }

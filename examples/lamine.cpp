@@ -98,13 +98,8 @@ public:
     Svec.SetSize(3);
     elvect.SetSize(dof*spaceDim);
     elvect = 0.0;
-    std::cout << "called\n";
-    const IntegrationRule *ir = IntRule;
-    if (ir == NULL)
-      {
-	int intorder = 2 * el.GetOrder();
-	ir = &IntRules.Get(el.GetGeomType(), intorder);
-      }
+   const IntegrationRule *ir = IntRule ? IntRule :  
+     &IntRules.Get(el.GetGeomType(), 2 * Tr.OrderGrad(&el));
     
     for (int i = 0; i < ir->GetNPoints(); i++)
       {
@@ -194,7 +189,9 @@ int main(int argc, char *argv[])
 
    Device device(device_config);
    device.Print();
-
+   if (!strcmp(device_config, "cuda") && !pa)
+     MFEM_ABORT("CUDA device requires partial assembly")
+       
    //   Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral or hexahedral elements with the same code.
    Mesh *mesh;
