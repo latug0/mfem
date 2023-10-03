@@ -18,7 +18,7 @@
 namespace mfem
 {
 
-  constexpr int MAXNDOF = 35;
+  constexpr int MAXNDOF = 39;
   constexpr int MAXNQ = 34;
   static void PAElasticitySetup_bis(const int dim,
 				    const int nq,
@@ -142,6 +142,8 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    ne = fes.GetNE();
    MFEM_VERIFY(dim == 2 || dim == 3, "");
    pa_data.SetSize((2+dim*dim) * nq * ne, mt);
+   if (nq < dim)
+     MFEM_ABORT("nq is too low");
    if (ndof > MAXNDOF)
      MFEM_ABORT("MAXNDOF too low");
    if (nq > MAXNQ)
@@ -286,19 +288,23 @@ void PAElasticityApply2D_optim(const int dim,
 			       Vector &py)
 {
   constexpr int MDIM = 2;
+  constexpr int NRED = 12;
   auto LM = Reshape(op.Read(), 2+dim*dim, nq, ne);
   auto Gt = Reshape(pGt.Read(),nq*ndof*dim);
   auto X = Reshape(px.Read(), ndof, dim, ne);
   auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
   int maxndofnq = (ndof>nq?ndof:nq);
-  mfem::forall_2D(ne, maxndofnq, MDIM, [=] MFEM_HOST_DEVICE (int e)
+  mfem::forall_3D(ne, maxndofnq, MDIM, NRED, [=] MFEM_HOST_DEVICE (int e)
       {
 	const int tidx = MFEM_THREAD_ID(x);
 	const int tidy = MFEM_THREAD_ID(y);
+	const int tidz = MFEM_THREAD_ID(z);
 	MFEM_SHARED double gshape[MDIM][MAXNQ*MAXNDOF];
+	MFEM_SHARED double res[NRED][MDIM][MAXNDOF];
 	MFEM_FOREACH_THREAD(ll,x,ndof) {  
 	  MFEM_FOREACH_THREAD(jj,y,MDIM) {
-	    for (int i = 0; i < nq; i++) {
+	    res[tidz][jj][ll] = 0.;
+	    MFEM_FOREACH_THREAD(i,z,nq) {
 	      gshape[jj][ll+ndof*i] = 0.;
 	      for (int ii = 0; ii < MDIM; ii++)
 		gshape[jj][ll+ndof*i] += Gt[ll+ndof*(i+nq*ii)] * LM(2+ii+jj*MDIM,i,e);
@@ -312,8 +318,7 @@ void PAElasticityApply2D_optim(const int dim,
 	MFEM_SHARED double contribC[MAXNQ][MDIM*MDIM];
 	MFEM_FOREACH_THREAD(jj,y,MDIM) {
 	  MFEM_FOREACH_THREAD(i,x,nq) {
-	    for (int ii = 0; ii < MDIM; ii++) {
-	      //	      for (int i = 0; i<nq; i++) {
+	    MFEM_FOREACH_THREAD(ii,z,MDIM) {
 	      contribB[i][jj+MDIM*ii] = 0.;
 	      contribA[i][jj+MDIM*ii] = 0;
 	      contribC[i][jj+MDIM*ii] = 0;
@@ -329,13 +334,23 @@ void PAElasticityApply2D_optim(const int dim,
 	
 	MFEM_FOREACH_THREAD(kk,x,ndof) {
 	  MFEM_FOREACH_THREAD(ii,y,MDIM) {
-	    for (int jj = 0; jj < MDIM; jj++) {
-	      for (int i = 0; i < nq; i++) {	    
+	    MFEM_FOREACH_THREAD(i,z,nq) {
+	      for (int jj = 0; jj < MDIM; jj++) {
 		const double LW = LM(1,i,e);
 		const double MW = LM(0,i,e);
-		Y(kk,ii,e) +=
+		res[tidz][ii][kk]  +=
 		  MW * gshape[jj][kk+ndof*i] * (contribA[i][jj+MDIM*ii]+ contribC[i][jj+MDIM*ii]) +
 		  LW * gshape[ii][kk+ndof*i] * contribB[i][jj+MDIM*ii] ;
+	      }
+	    }
+	  }
+	}
+	MFEM_SYNC_THREAD;
+	if (tidz == 0) {
+	  MFEM_FOREACH_THREAD(kk,x,ndof) {
+	    MFEM_FOREACH_THREAD(ii,y,MDIM) {
+	      for (int jj = 0; jj < MFEM_THREAD_SIZE(z); jj++) {	    
+		Y(kk,ii,e) += res[jj][ii][kk];
 	      }
 	    }
 	  }
