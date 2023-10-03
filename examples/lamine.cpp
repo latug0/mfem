@@ -223,8 +223,8 @@ int main(int argc, char *argv[])
    }
 
    //  Refine the mesh.
-   {
-      int ref_levels = 0;
+   if (dim == 2) {
+      int ref_levels = 1;
       for (int l = 0; l < ref_levels; l++)
       {
          mesh->UniformRefinement();
@@ -342,7 +342,7 @@ int main(int argc, char *argv[])
    // solve the system Ax=b with PCG.
 //   GSSmoother M(A);
 //   PCG(A, M, B, X, 1, 500, 1e-24, 0.0);
-   CG(*A, B, X, 1, 1200, 1e-24, 0.0);
+   CG(*A, B, X, 1, 2100, 1e-24, 0.0);
    //CG(A, B, X, 1, 500, 1e-24, 0.0);
 
    //  Recover the solution as a finite element grid function.
