@@ -142,8 +142,6 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    ne = fes.GetNE();
    MFEM_VERIFY(dim == 2 || dim == 3, "");
    pa_data.SetSize((2+dim*dim) * nq * ne, mt);
-   if (nq < dim)
-     MFEM_ABORT("nq is too low");
    if (ndof > MAXNDOF)
      MFEM_ABORT("MAXNDOF too low");
    if (nq > MAXNQ)
@@ -294,6 +292,8 @@ void PAElasticityApply2D_optim(const int dim,
   auto X = Reshape(px.Read(), ndof, dim, ne);
   auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
   int maxndofnq = (ndof>nq?ndof:nq);
+  if (nq < dim)
+    MFEM_ABORT("nq is too low");
   mfem::forall_3D(ne, maxndofnq, MDIM, NRED, [=] MFEM_HOST_DEVICE (int e)
       {
 	const int tidx = MFEM_THREAD_ID(x);
