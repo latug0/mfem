@@ -162,6 +162,8 @@ int main(int argc, char *argv[])
    //    Parse command-line options.
    const char *mesh_file = "square_2mat_per.msh";
    bool pa = false;
+   bool postproc = true;
+   int ref = 0;
    int order = 1;
    int tcase = 1;
    bool static_cond = false;
@@ -171,12 +173,16 @@ int main(int argc, char *argv[])
    OptionsParser args(argc, argv);
    args.AddOption(&pa, "-pa", "--partial-assembly", "-no-pa",
                   "--no-partial-assembly", "Enable Partial Assembly.");
+   args.AddOption(&postproc, "-po", "--postproc", "-no-po",
+                  "--no-postproc", "Enable prosprocessing.");
    args.AddOption(&mesh_file, "-m", "--mesh",
                   "Mesh file to use.");
    args.AddOption(&order, "-o", "--order",
                   "Finite element order (polynomial degree).");
    args.AddOption(&tcase, "-t", "--tcase",
                   "identifier of the case : Exx->1, Eyy->2, Ezz->3, Exy->4, Eyz->5, Exz->6");
+   args.AddOption(&ref, "-r", "--refine",
+                  "Nb of refine steps");
    args.AddOption(&device_config, "-d", "--device",
                   "Device configuration string, see Device::Configure().");
    args.Parse();
@@ -223,13 +229,11 @@ int main(int argc, char *argv[])
    }
 
    //  Refine the mesh.
-   if (dim == 2) {
-      int ref_levels = 1;
-      for (int l = 0; l < ref_levels; l++)
-      {
-         mesh->UniformRefinement();
-      }
-   }
+   int ref_levels = ref;
+   for (int l = 0; l < ref_levels; l++)
+     {
+       mesh->UniformRefinement();
+     }
 
    //    Define a finite element space on the mesh. Here we use vector finite
    //    elements, i.e. dim copies of a scalar finite element space. The vector
@@ -349,7 +353,7 @@ int main(int argc, char *argv[])
    a->RecoverFEMSolution(X, rhs, x);
    
    //  Save the results
-   {
+   if (postproc) {
      ParaViewDataCollection paraview_dc("per", mesh);
      std::string letters = "xyz";
      Array<GridFunction *> stress(dim*(dim+1)/2);
@@ -442,24 +446,29 @@ int main(int argc, char *argv[])
      exit (1);
      break;
    }
-   VectorFunctionCoefficient sol_coef (dim, sol_exact);
-   double errorL2 = x.ComputeL2Error(sol_coef);
-   cerr<<"\ntcase " << tcase << " -- L2 norm: " << errorL2 << endl;
+   double errorL2 = 0.;
+   if (postproc) {
+     VectorFunctionCoefficient sol_coef (dim, sol_exact);
+     errorL2= x.ComputeL2Error(sol_coef);
+     cerr<<"\ntcase " << tcase << " -- L2 norm: " << errorL2 << endl;
+   }
    delete a;
    delete fespace;
    delete fec;
    delete fieldspace;
    delete mesh;
-   if (errorL2 < 1e-10)
-     {
-       cerr << "OK" << endl;
-       return 0;
-     }
-   else
-     {
-       cerr << "Fail" << endl;
-       return 1;
-     }
+   if (postproc) {
+     if (errorL2 < 1e-10)
+       {
+	 cerr << "OK" << endl;
+	 return 0;
+       }
+     else
+       {
+	 cerr << "Fail" << endl;
+	 return 1;
+       }
+   }
 }
 
 

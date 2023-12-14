@@ -19,7 +19,7 @@ namespace mfem
 {
 
   constexpr int MAXNDOF = 32;
-  constexpr int MAXNQ = 31;
+  constexpr int MAXNQ = 33;
   static void PAElasticitySetup_bis(const int dim,
 				    const int nq,
 				    const int ne,
