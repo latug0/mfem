@@ -3009,6 +3009,7 @@ private:
    // PA extension
    const DofToQuad *maps;         ///< Not owned
    int dim, ne, nq, ndof;
+   int dofs1D, quad1D;
    Vector pa_data;
 
 public:
@@ -3054,6 +3055,8 @@ public:
 
    using BilinearFormIntegrator::AssemblePA;
    virtual void AssemblePA(const FiniteElementSpace &fes);
+   virtual void AssembleEA(const FiniteElementSpace &fes, Vector &emat,
+                           const bool add);
    virtual void AssembleDiagonalPA(Vector &diag);
    virtual void AddMultPA(const Vector &x, Vector &y) const;
 };

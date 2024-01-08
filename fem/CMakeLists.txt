@@ -15,6 +15,7 @@ set(SRCS
   bilininteg.cpp
   integ/bilininteg_br2.cpp
   integ/bilininteg_elasticity_pa.cpp
+  integ/bilininteg_elasticity_ea.cpp
   integ/bilininteg_convection_mf.cpp
   integ/bilininteg_convection_pa.cpp
   integ/bilininteg_convection_ea.cpp

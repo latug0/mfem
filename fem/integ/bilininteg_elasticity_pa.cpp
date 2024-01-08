@@ -136,6 +136,8 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    CoefficientVector coefflambda(qs, CoefficientStorage::COMPRESSED);
    coeffmu.Project(*mu);
    coefflambda.Project(*lambda);
+   dofs1D = maps->ndof;
+   quad1D = maps->nqpt;
    dim = el.GetDim();
    ndof = el.GetDof();
    nq = ir->GetNPoints();
