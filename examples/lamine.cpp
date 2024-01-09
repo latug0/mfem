@@ -162,6 +162,7 @@ int main(int argc, char *argv[])
    //    Parse command-line options.
    const char *mesh_file = "square_2mat_per.msh";
    bool pa = false;
+   bool ea = false;
    bool postproc = true;
    int ref = 0;
    int order = 1;
@@ -173,6 +174,8 @@ int main(int argc, char *argv[])
    OptionsParser args(argc, argv);
    args.AddOption(&pa, "-pa", "--partial-assembly", "-no-pa",
                   "--no-partial-assembly", "Enable Partial Assembly.");
+   args.AddOption(&ea, "-ea", "--element-assembly", "-no-ea",
+                  "--no-element-assembly", "Enable Element Assembly.");
    args.AddOption(&postproc, "-po", "--postproc", "-no-po",
                   "--no-postproc", "Enable prosprocessing.");
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -195,8 +198,8 @@ int main(int argc, char *argv[])
 
    Device device(device_config);
    device.Print();
-   if (!strcmp(device_config, "cuda") && !pa)
-     MFEM_ABORT("CUDA device requires partial assembly")
+   if (!strcmp(device_config, "cuda") && (!pa && !ea))
+     MFEM_ABORT("CUDA device requires partial or element assembly")
        
    //   Read the mesh from the given mesh file. We can handle triangular,
    //    quadrilateral, tetrahedral or hexahedral elements with the same code.
@@ -323,10 +326,11 @@ int main(int argc, char *argv[])
    }
    BilinearForm *a = new BilinearForm(fespace);
    if (pa) { a->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
+   if (ea) { a->SetAssemblyLevel(AssemblyLevel::ELEMENT); }
    auto ei = new ElasticityIntegrator(lambda_func,mu_func);
    a->AddDomainIntegrator(ei);
    const FiniteElementSpace &fes = *fespace;
-   if (!pa) ei->AssemblePA(*fespace);
+   if (!pa && !ea) ei->AssemblePA(*fespace);
    a->Assemble();
   
    // Set up the right-hand side of the FEM linear system.
