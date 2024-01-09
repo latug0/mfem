@@ -16,13 +16,14 @@
 namespace mfem
 {
 
+const int MAXNDOF = ElasticityIntegrator::MAXNDOF;
+const int MAXNQ = ElasticityIntegrator::MAXNQ;
 
 template<int T_D1D = 0, int T_Q1D = 0>
 static void EAElasticityAssemble2D(const int NE,
 				   const int NDOFS,
 				   const int NQ,
-				   const Array<double> &b,
-				   const Array<double> &g,
+				   const Array<double> &pGt,
 				   const Vector &padata,
 				   Vector &eadata,
 				   const bool add,
@@ -36,12 +37,47 @@ static void EAElasticityAssemble2D(const int NE,
 //   auto B = Reshape(b.Read(), Q1D, D1D);
 //   auto G = Reshape(g.Read(), Q1D, D1D);
    constexpr int MDIM = 2;
+   auto Gt = Reshape(pGt.Read(),NQ*NDOFS*MDIM);
    auto LM = Reshape(padata.Read(), 2+MDIM*MDIM, NQ, NE);
 
    // TODO: Check ndof value
-   auto A = Reshape(eadata.ReadWrite(), NDOFS, NDOFS, NE);
-   mfem::forall(NE*NDOFS, [=] MFEM_HOST_DEVICE (int e)
+   auto A = Reshape(eadata.ReadWrite(), NDOFS, MDIM, NDOFS, MDIM, NE);
+   mfem::forall(NE, [=] MFEM_HOST_DEVICE (int e)
    {
+     for (int i=0; i<NQ; i++) {
+       double gshape[MAXNDOF][MDIM];
+       double LW = LM(1,i,e);
+       double MW = LM(0,i,e);
+       
+       for (int kk = 0; kk < MDIM; kk++) 
+	 for (int ll = 0; ll < NDOFS; ll++) {
+	   gshape[ll][kk] = 0.;
+	   for (int mm = 0; mm < MDIM; mm++)
+	     gshape[ll][kk] +=
+	       Gt[ll+NDOFS*(i+NQ*mm)] * LM(2+mm+kk*MDIM,i,e);
+	 }
+       
+       for (int ii = 0; ii < MDIM; ii++)
+	 for (int jj = 0; jj < MDIM; jj++) {
+	   for (int kk = 0; kk < NDOFS; kk++) {
+	     for (int ll = 0; ll < NDOFS; ll++) {
+	       A(kk,ii,ll,ii,e) +=
+		 MW * gshape[kk][jj] * gshape[ll][jj];
+	     }
+	   }
+	 }
+
+       for (int ii = 0; ii < MDIM; ii++)
+	 for (int jj = 0; jj < MDIM; jj++) {
+	   for (int kk = 0; kk < NDOFS; kk++) {
+	     for (int ll = 0; ll < NDOFS; ll++) {
+	       A(kk,ii,ll,jj,e) +=
+		 LW * gshape[kk][ii] * gshape[ll][jj] +
+		 MW * gshape[kk][jj] * gshape[ll][ii];
+	     }
+	   }
+	 }
+     }
    });
 }
 
@@ -50,8 +86,7 @@ template<int T_D1D = 0, int T_Q1D = 0>
 static void EAElasticityAssemble3D(const int NE,
 				   const int NDOFS,
 				   const int NQ,
-				   const Array<double> &b,
-				   const Array<double> &g,
+				   const Array<double> &pGt,
 				   const Vector &padata,
 				   Vector &eadata,
 				   const bool add,
@@ -65,14 +100,47 @@ static void EAElasticityAssemble3D(const int NE,
 //   auto B = Reshape(b.Read(), Q1D, D1D);
 //   auto G = Reshape(g.Read(), Q1D, D1D);
    constexpr int MDIM = 3;
+   auto Gt = Reshape(pGt.Read(),NQ*NDOFS*MDIM);
    auto LM = Reshape(padata.Read(), 2+MDIM*MDIM, NQ, NE);
-   auto A = Reshape(eadata.ReadWrite(), NDOFS, NDOFS, NE);
-   mfem::forall(NE*NDOFS, [=] MFEM_HOST_DEVICE (int e)
+
+   // TODO: Check ndof value
+   auto A = Reshape(eadata.ReadWrite(), NDOFS, MDIM, NDOFS, MDIM, NE);
+   mfem::forall(NE, [=] MFEM_HOST_DEVICE (int e)
    {
-      const int D1D = T_D1D ? T_D1D : d1d;
-      const int Q1D = T_Q1D ? T_Q1D : q1d;
-      constexpr int MD1 = T_D1D ? T_D1D : MAX_D1D;
-      constexpr int MQ1 = T_Q1D ? T_Q1D : MAX_Q1D;
+     for (int i=0; i<NQ; i++) {
+       double gshape[MAXNDOF][MDIM];
+       double LW = LM(1,i,e);
+       double MW = LM(0,i,e);
+       
+       for (int kk = 0; kk < MDIM; kk++) 
+	 for (int ll = 0; ll < NDOFS; ll++) {
+	   gshape[ll][kk] = 0.;
+	   for (int mm = 0; mm < MDIM; mm++)
+	     gshape[ll][kk] +=
+	       Gt[ll+NDOFS*(i+NQ*mm)] * LM(2+mm+kk*MDIM,i,e);
+	 }
+       
+       for (int ii = 0; ii < MDIM; ii++)
+	 for (int jj = 0; jj < MDIM; jj++) {
+	   for (int kk = 0; kk < NDOFS; kk++) {
+	     for (int ll = 0; ll < NDOFS; ll++) {
+	       A(kk,ii,ll,ii,e) +=
+		 MW * gshape[kk][jj] * gshape[ll][jj];
+	     }
+	   }
+	 }
+
+       for (int ii = 0; ii < MDIM; ii++)
+	 for (int jj = 0; jj < MDIM; jj++) {
+	   for (int kk = 0; kk < NDOFS; kk++) {
+	     for (int ll = 0; ll < NDOFS; ll++) {
+	       A(kk,ii,ll,jj,e) +=
+		 LW * gshape[kk][ii] * gshape[ll][jj] +
+		 MW * gshape[kk][jj] * gshape[ll][ii];
+	     }
+	   }
+	 }
+     }
    });
 }
   
@@ -83,16 +151,19 @@ void ElasticityIntegrator::AssembleEA(const FiniteElementSpace &fes,
 {
    AssemblePA(fes);
    //   ne = fes.GetMesh()->GetNE();
-   const Array<double> &B = maps->B;
-   const Array<double> &G = maps->G;
+   const Array<double> &Gt = maps->Gt;
+
+   std::cout << "param_ea ndof= " << ndof  << "  nq=" << nq  << " ne=" << ne << "\n" ;
+   std::cout << "          d1d=" << dofs1D << " q1d=" << quad1D << "\n" ;
+
    if (dim == 2)
    {
-     return EAElasticityAssemble2D(ne,ndof,nq,B,G,pa_data,ea_data,
+     return EAElasticityAssemble2D(ne,ndof,nq,Gt,pa_data,ea_data,
 				   add,dofs1D,quad1D);
    }
    else if (dim == 3)
    {
-     return EAElasticityAssemble3D(ne,ndof,nq,B,G,pa_data,ea_data,
+     return EAElasticityAssemble3D(ne,ndof,nq,Gt,pa_data,ea_data,
 				   add,dofs1D,quad1D);
    }
    MFEM_ABORT("Unknown kernel.");

@@ -587,6 +587,7 @@ void EABilinearFormExtension::Assemble()
    ne = trial_fes->GetMesh()->GetNE();
    elemDofs = trial_fes->GetFE(0)->GetDof();
 
+   std::cout << "assemble_ea elDofs= " << elemDofs  << "\n" ;
    ea_data.SetSize(ne*elemDofs*elemDofs, Device::GetMemoryType());
    ea_data.UseDevice(true);
 

@@ -3011,8 +3011,11 @@ private:
    int dim, ne, nq, ndof;
    int dofs1D, quad1D;
    Vector pa_data;
+  
 
 public:
+   static const int MAXNDOF = 32;
+   static const int MAXNQ = 33;
    ElasticityIntegrator(Coefficient &l, Coefficient &m)
    { lambda = &l; mu = &m; }
    /** With this constructor lambda = q_l * m and mu = q_m * m;

@@ -17,9 +17,9 @@
 
 namespace mfem
 {
+  const int MAXNDOF = ElasticityIntegrator::MAXNDOF;
+  const int MAXNQ = ElasticityIntegrator::MAXNQ;
 
-  constexpr int MAXNDOF = 32;
-  constexpr int MAXNQ = 33;
   static void PAElasticitySetup_bis(const int dim,
 				    const int nq,
 				    const int ne,
@@ -149,7 +149,8 @@ void ElasticityIntegrator::AssemblePA(const FiniteElementSpace &fes)
    if (nq > MAXNQ)
      MFEM_ABORT("MAXNQ too low");
    
-   std::cout << "optim ne=" << ne << " nq=" << nq << " ndof " << ndof << "\n" ;
+   std::cout << "param_pa ndof= " << ndof  << "  nq=" << nq  << " ne=" << ne <<"\n" ;
+   std::cout << "          d1d=" << dofs1D << " q1d=" << quad1D << "\n" ;
   
    PAElasticitySetup(dim, nq, ne, ndof, geom->J, maps->Gt, ir->GetWeights(),
 		     coeffmu, coefflambda, pa_data);
