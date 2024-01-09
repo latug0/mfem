@@ -30,12 +30,6 @@ static void EAElasticityAssemble2D(const int NE,
 				   const int d1d = 0,
 				   const int q1d = 0)
 {
-//   const int D1D = T_D1D ? T_D1D : d1d;
-//   const int Q1D = T_Q1D ? T_Q1D : q1d;
-//   MFEM_VERIFY(D1D <= MAX_D1D, "");
-//   MFEM_VERIFY(Q1D <= MAX_Q1D, "");
-//   auto B = Reshape(b.Read(), Q1D, D1D);
-//   auto G = Reshape(g.Read(), Q1D, D1D);
    constexpr int MDIM = 2;
    auto Gt = Reshape(pGt.Read(),NQ*NDOFS*MDIM);
    auto LM = Reshape(padata.Read(), 2+MDIM*MDIM, NQ, NE);
@@ -93,12 +87,6 @@ static void EAElasticityAssemble3D(const int NE,
 				   const int d1d = 0,
 				   const int q1d = 0)
 {
-//   const int D1D = T_D1D ? T_D1D : d1d;
-//   const int Q1D = T_Q1D ? T_Q1D : q1d;
-//   MFEM_VERIFY(D1D <= MAX_D1D, "");
-//   MFEM_VERIFY(Q1D <= MAX_Q1D, "");
-//   auto B = Reshape(b.Read(), Q1D, D1D);
-//   auto G = Reshape(g.Read(), Q1D, D1D);
    constexpr int MDIM = 3;
    auto Gt = Reshape(pGt.Read(),NQ*NDOFS*MDIM);
    auto LM = Reshape(padata.Read(), 2+MDIM*MDIM, NQ, NE);
