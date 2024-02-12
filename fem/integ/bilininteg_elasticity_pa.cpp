@@ -425,6 +425,7 @@ void PAElasticityApply3D_optim(const int dim,
   auto X = Reshape(px.Read(), ndof, dim, ne);
   auto Y = Reshape(py.ReadWrite(), ndof, dim, ne);
   int maxndofnq = (ndof>nq?ndof:nq);
+  std::cout << "mult_pa ysize= " << ndof*dim*ne <<" " << ndof << " " << dim << " " << ne << "\n" ;
   mfem::forall_3D(ne, maxndofnq, MDIM, NRED, [=] MFEM_HOST_DEVICE (int e)
       {
 	const int tidx = MFEM_THREAD_ID(x);

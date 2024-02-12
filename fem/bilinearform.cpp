@@ -759,6 +759,7 @@ void BilinearForm::FormLinearSystem(const Array<int> &ess_tdof_list, Vector &x,
    }
    const SparseMatrix *P = fes->GetConformingProlongation();
    FormSystemMatrix(ess_tdof_list, A);
+   std::cout << "form linearsystem= " << A->NumCols() << "\n" ;
 
    // Transform the system and perform the elimination in B, based on the
    // essential BC values from x. Restrict the BC part of x in X, and set the

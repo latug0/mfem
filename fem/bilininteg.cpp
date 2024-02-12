@@ -3128,6 +3128,7 @@ void ElasticityIntegrator::AssembleElementMatrix(
    Mesh *mesh = Trans.mesh;
    auto  maps = &el.GetDofToQuad(*ir, DofToQuad::FULL);
 
+   //   std::cout << "bilinteg ndof= " << ndof  << "  dim=" << dim  << " nq=" << nq << "\n" ;
    elmat = 0.0;
    nq =ir->GetNPoints();
    for (int i = 0; i < nq; i++)

@@ -587,8 +587,9 @@ void EABilinearFormExtension::Assemble()
    ne = trial_fes->GetMesh()->GetNE();
    elemDofs = trial_fes->GetFE(0)->GetDof();
 
-   std::cout << "assemble_ea elDofs= " << elemDofs  << "\n" ;
+   std::cout << "assemble_ea elDofs= " << elemDofs  << " ne= "<< ne <<"\n" ;
    ea_data.SetSize(ne*elemDofs*elemDofs, Device::GetMemoryType());
+   std::cout << "assemble_ea nb unknowns= " << ne*elemDofs  << "\n" ;
    ea_data.UseDevice(true);
 
    Array<BilinearFormIntegrator*> &integrators = *a->GetDBFI();
@@ -658,11 +659,13 @@ void EABilinearFormExtension::Mult(const Vector &x, Vector &y) const
    {
       y.UseDevice(true); // typically this is a large vector, so store on device
       y = 0.0;
+      std::cout << "mult_ea no_u nbunkowns= " << y.Size()  << "\n" ;
    }
    else
    {
       elem_restrict->Mult(x, localX);
       localY = 0.0;
+      std::cout << "mult_ea use nbunkowns= " << localY.Size()  << "\n" ;
    }
    // Apply the Element Matrices
    {
@@ -670,6 +673,7 @@ void EABilinearFormExtension::Mult(const Vector &x, Vector &y) const
       auto X = Reshape(useRestrict?localX.Read():x.Read(), NDOFS, ne);
       auto Y = Reshape(useRestrict?localY.ReadWrite():y.ReadWrite(), NDOFS, ne);
       auto A = Reshape(ea_data.Read(), NDOFS, NDOFS, ne);
+      std::cout << "mult_ea ne= " << ne  << " NDOFS " << NDOFS << "ERROR !\n" ;
       mfem::forall(ne*NDOFS, [=] MFEM_HOST_DEVICE (int glob_j)
       {
          const int e = glob_j/NDOFS;

@@ -355,6 +355,7 @@ int main(int argc, char *argv[])
 
    //  Recover the solution as a finite element grid function.
    a->RecoverFEMSolution(X, rhs, x);
+   std::cout << "syst solve nbunkowns= " << B.Size() << " " << x.Size() << " " << X.Size() << "\n" ;
    
    //  Save the results
    if (postproc) {

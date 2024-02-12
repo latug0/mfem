@@ -35,7 +35,7 @@ static void EAElasticityAssemble2D(const int NE,
    auto LM = Reshape(padata.Read(), 2+MDIM*MDIM, NQ, NE);
 
    // TODO: Check ndof value
-   auto A = Reshape(eadata.ReadWrite(), NDOFS, MDIM, NDOFS, MDIM, NE);
+   auto A = Reshape(eadata.ReadWrite(), NDOFS, NDOFS, NE);
    mfem::forall(NE, [=] MFEM_HOST_DEVICE (int e)
    {
      for (int i=0; i<NQ; i++) {
@@ -55,8 +55,8 @@ static void EAElasticityAssemble2D(const int NE,
 	 for (int jj = 0; jj < MDIM; jj++) {
 	   for (int kk = 0; kk < NDOFS; kk++) {
 	     for (int ll = 0; ll < NDOFS; ll++) {
-	       A(kk,ii,ll,ii,e) +=
-		 MW * gshape[kk][jj] * gshape[ll][jj];
+//	       A(kk,ii,ll,ii,e) +=
+//		 MW * gshape[kk][jj] * gshape[ll][jj];
 	     }
 	   }
 	 }
@@ -65,9 +65,9 @@ static void EAElasticityAssemble2D(const int NE,
 	 for (int jj = 0; jj < MDIM; jj++) {
 	   for (int kk = 0; kk < NDOFS; kk++) {
 	     for (int ll = 0; ll < NDOFS; ll++) {
-	       A(kk,ii,ll,jj,e) +=
-		 LW * gshape[kk][ii] * gshape[ll][jj] +
-		 MW * gshape[kk][jj] * gshape[ll][ii];
+//	       A(kk,ii,ll,jj,e) +=
+//		 LW * gshape[kk][ii] * gshape[ll][jj] +
+//		 MW * gshape[kk][jj] * gshape[ll][ii];
 	     }
 	   }
 	 }
@@ -92,7 +92,7 @@ static void EAElasticityAssemble3D(const int NE,
    auto LM = Reshape(padata.Read(), 2+MDIM*MDIM, NQ, NE);
 
    // TODO: Check ndof value
-   auto A = Reshape(eadata.ReadWrite(), NDOFS, MDIM, NDOFS, MDIM, NE);
+   auto A = Reshape(eadata.ReadWrite(), NDOFS, NDOFS, NE);
    mfem::forall(NE, [=] MFEM_HOST_DEVICE (int e)
    {
      for (int i=0; i<NQ; i++) {
@@ -112,8 +112,8 @@ static void EAElasticityAssemble3D(const int NE,
 	 for (int jj = 0; jj < MDIM; jj++) {
 	   for (int kk = 0; kk < NDOFS; kk++) {
 	     for (int ll = 0; ll < NDOFS; ll++) {
-	       A(kk,ii,ll,ii,e) +=
-		 MW * gshape[kk][jj] * gshape[ll][jj];
+//	       A(kk,ii,ll,ii,e) +=
+//		 MW * gshape[kk][jj] * gshape[ll][jj];
 	     }
 	   }
 	 }
@@ -122,9 +122,9 @@ static void EAElasticityAssemble3D(const int NE,
 	 for (int jj = 0; jj < MDIM; jj++) {
 	   for (int kk = 0; kk < NDOFS; kk++) {
 	     for (int ll = 0; ll < NDOFS; ll++) {
-	       A(kk,ii,ll,jj,e) +=
-		 LW * gshape[kk][ii] * gshape[ll][jj] +
-		 MW * gshape[kk][jj] * gshape[ll][ii];
+//	       A(kk,ii,ll,jj,e) +=
+//		 LW * gshape[kk][ii] * gshape[ll][jj] +
+//		 MW * gshape[kk][jj] * gshape[ll][ii];
 	     }
 	   }
 	 }
@@ -141,6 +141,7 @@ void ElasticityIntegrator::AssembleEA(const FiniteElementSpace &fes,
    //   ne = fes.GetMesh()->GetNE();
    const Array<double> &Gt = maps->Gt;
 
+   std::cout << "param_ea predict ne*dim= " << ne*dim <<  "\n" ;
    std::cout << "param_ea ndof= " << ndof  << "  nq=" << nq  << " ne=" << ne << "\n" ;
    std::cout << "          d1d=" << dofs1D << " q1d=" << quad1D << "\n" ;
 
