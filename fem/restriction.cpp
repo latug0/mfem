@@ -409,6 +409,8 @@ void ElementRestriction::FillJAndData(const Vector &ea_data,
    auto d_offsets = offsets.Read();
    auto d_indices = indices.Read();
    auto d_gather_map = gather_map.Read();
+   std::cout << "ElementRestriction::FillJAndData elt_dofs " << elt_dofs << " ne " << ne << "\n";
+   // Grosse hypothèse sur la structure de ea_data, un scalaire pour chaque dof
    auto mat_ea = Reshape(ea_data.Read(), elt_dofs, elt_dofs, ne);
    mfem::forall(ne*elt_dofs, [=] MFEM_HOST_DEVICE (int l_dof)
    {

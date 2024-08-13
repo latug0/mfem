@@ -674,6 +674,7 @@ void EABilinearFormExtension::Mult(const Vector &x, Vector &y) const
       auto Y = Reshape(useRestrict?localY.ReadWrite():y.ReadWrite(), NDOFS, ne);
       auto A = Reshape(ea_data.Read(), NDOFS, NDOFS, ne);
       std::cout << "mult_ea ne= " << ne  << " NDOFS " << NDOFS << "ERROR !\n" ;
+      // Grosse hypothèse sur la structure de ea_data, un scalaire pour chaque dof
       mfem::forall(ne*NDOFS, [=] MFEM_HOST_DEVICE (int glob_j)
       {
          const int e = glob_j/NDOFS;
@@ -927,6 +928,7 @@ FABilinearFormExtension::FABilinearFormExtension(BilinearForm *form)
 
 void FABilinearFormExtension::Assemble()
 {
+  std::cout << "FABilinearFormExtension::Assemble !\n" ;
    EABilinearFormExtension::Assemble();
    FiniteElementSpace &fes = *a->FESpace();
    int width = fes.GetVSize();
@@ -951,6 +953,7 @@ void FABilinearFormExtension::Assemble()
 #endif
    if (a->mat) // We reuse the sparse matrix memory
    {
+     std::cout << "a->mat is true\n" ;
       if (fes.IsDGSpace())
       {
          const L2ElementRestriction *restE =
@@ -982,10 +985,12 @@ void FABilinearFormExtension::Assemble()
    }
    else // We create, compute the sparsity, and fill the sparse matrix
    {
+      std::cout << "a->mat is false\n" ;
       mat = new SparseMatrix;
       mat->OverrideSize(height, width);
       if (fes.IsDGSpace())
       {
+	 std::cout << "DGSpace\n" ;
          const L2ElementRestriction *restE =
             static_cast<const L2ElementRestriction*>(elem_restrict);
          const L2FaceRestriction *restF =
@@ -1027,6 +1032,7 @@ void FABilinearFormExtension::Assemble()
       }
       else // continuous Galerkin case
       {
+	 std::cout << "continuous space\n" ;
          const ElementRestriction &rest =
             static_cast<const ElementRestriction&>(*elem_restrict);
          rest.FillSparseMatrix(ea_data, *mat);

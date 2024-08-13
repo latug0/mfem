@@ -248,7 +248,8 @@ int main(int argc, char *argv[])
    fec = new H1_FECollection(order, dim);
    fespace = new FiniteElementSpace(mesh, fec, dim, Ordering::byVDIM);
    fieldspace = new FiniteElementSpace(mesh, fec, 1, Ordering::byVDIM);
-
+   cout << "Number of unknowns: " << fespace->GetVSize() << endl;
+  
    int ndof = fespace->GetTrueVSize() / dim;
    cout << "Number of finite element unknowns: " << fespace->GetTrueVSize() << " ndof: " << ndof << " dim: " << dim
         << endl << "Assembling: " << flush;
